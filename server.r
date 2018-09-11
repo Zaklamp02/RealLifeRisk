@@ -19,7 +19,7 @@
 server <- function(input, output, session) {
   
   #-------------------------------------------#
-  # 1. DEFINE REACTIVE DATA
+  # 1. DEFINE USER VARIABLES
   #-------------------------------------------#
   d   <- reactiveValues(bs=boardState)                                                         # reactive values are special, and (should) do downstream cascading if they are updated
   sel <- reactiveValues(row=1)                                                                 # i.e. if you update this value, all outputs that use this value get updated too
@@ -51,11 +51,29 @@ server <- function(input, output, session) {
   # 2.b. OBSERVE: ACTION SUBMISSION
   #-------------------------------------------#
   observeEvent(input$a1submit,{                                                               # observe if a new 'action 1'  is submitted (using drop-down buttons)
-    msg <- check_action(d$bs,input$a1p1,input$a1p2,input$a1p3,input$a1p4,input$a1p5,input$a1p6,input$a1p7) # if so, check if action is valid
-    if(msg=='success'){                                                                       # IF the action is valid (i.e. success)
-      d$bs <- do_move(d$bs,input$a1p1,input$a1p2,input$a1p3,input$a1p4,input$a1p5,input$a1p6,input$a1p7) # THEN actually perform the move
+  })
+  
+  observeEvent(input$p1a1submit,{
+    act <- parse_action(input$p1a1)
+    
+    if(act$type=="succes"){
+      chk <- check_action(d$bs,act$player,act$unit,act$quantity,act$x1,act$y1,act$x2,act$y2)
+      act$type  <- chk$type
+      act$msg   <- chk$msg
     }
-    output$a1result <- renderText({msg})                                                      # report back on the outcome of the action
+
+    if(act$type=="succes"){                                                                       # IF the action is valid (i.e. success)
+      if(is.na(act$x2) & is.na(act$y2)){
+        d$bs <- create_unit(d$bs,act$player,act$unit,act$quantity,act$x1,act$y1)
+        act$msg <- 'unit gekocht'
+      } else {
+        d$bs <- do_move(d$bs,act$player,act$unit,act$quantity,act$x1,act$y1,act$x2,act$y2) # THEN actually perform the move
+        act$msg <- 'unit succesvol geplaatst'
+      }
+    }
+    
+    output$endOfTurnResult <- renderText(paste(act))
+    updateActionButton(session,"p1a1submit",label=act$type)
   })
   
   #-------------------------------------------#
@@ -66,42 +84,46 @@ server <- function(input, output, session) {
     
     #-------------------------------------------#
     # 2.c.1. CHECK/EXECUTE BATTLES
-    for(x in d$bs$xPos){                                                                      # loop over all x coördinates
-      for(y in d$bs$yPos){                                                                    # loop over all y coördinates
+    for(x in unique(d$bs$xPos)){                                                                      # loop over all x coördinates
+      for(y in unique(d$bs$yPos)){                                                                    # loop over all y coördinates
         if( any(d$bs$xPos==x & d$bs$yPos==y) ){                                               # check if ANY units occupy the current square
           if(length(unique(d$bs$player[d$bs$xPos==x & d$bs$yPos==y]))>1){                     # check if >1 PLAYER occupies the current square
-            d$bs <- do_battle(d$bs,x,y)                                                       # if so, trigger battle engine
+            battleOutcome <- battle_engine(d$bs,x,y)                                                       # if so, trigger battle engine
             msg <- paste(msg,'battle at: ',x,y,' winner: ',unique(d$bs$player[d$bs$xPos==x & d$bs$yPos==y]),sep='') # log the outcome
+            msg2 <- battleOutcome$msg
+            d$bs <- battleOutcome$boardState
           }
         }
       }
     }
     output$endOfTurnResult <- renderText({msg})                                               # report back on the outcome of the turn
+    output$battleResult <- renderUI({HTML(msg2)})
   })
   
   #-------------------------------------------#
   # 2.d. OBSERVE: MOUSE CLICKS
   #-------------------------------------------#
-  # !!! This function should be drastically improved:
-  # -> use boardDef instead of boardState
-  # -> check with coördinate is clicked, instead of which unit is nearest
-  # -> be robust against multiple units on 1 square
   observe({                                                                                   # tbh: I'm not sure between 'Observe' and 'ObserveEvent'
     if(is.null(input$board_click$x)) return(NULL)                                             # if nothing was clicked yet, do nothing
-    sel$row <- boardState$xRes == max(boardState$xRes[boardState$xRes <= input$board_click$x]) & boardState$yRes == max(boardState$yRes[boardState$yRes <= input$board_click$y]) # find coördinate closest to click (towards bottom-left)
-    usel <- paste(d$bs[sel$row,c('player','unit')],collapse="-")                              # find which unit corresponds to selected coördinate
-    updateActionButton(session,"btn_sel",label=usel)                                          # if unit is found, update the button-label
+    
+    xTmp <- input$board_click$x - input$board_click$x %% sprRes[1]                            # find nearest x coördinate
+    yTmp <- input$board_click$y - input$board_click$y %% sprRes[2]                            # find nearest y coördinate
+
+    if(any(d$bs$xRes == xTmp & d$bs$yRes == yTmp)) {                                          # check if units exist on location
+      sel$row <- sort(which(d$bs$xRes==xTmp & d$bs$yRes==yTmp),decreasing=T)[1]               # select only the sprite on top (i.e. the unit that you see)
+      updateActionButton(session,"btn_sel",label=paste(d$bs[sel$row,c('player','unit')],collapse="-")) # if unit is found, update the button-label
+    }
   })
   
   #-------------------------------------------#
   # 3.a RENDER: GAME BOARD
   #-------------------------------------------#
   output$game_board <- renderPlot({                                                           # this is the actual fun stuff: the game board!
+    
     par(mar=rep(0,4))                                                                         # set figure margins to 0
-    plot.new()                                                                                # make sure we start on a new plot
     plot.window(xlim=c(0,gridRes[1]),ylim=c(0,gridRes[2]))                                    # create a window with correct size
     rasterImage(base_map,0,0,gridRes[1],gridRes[2])                                           # create 'base layer' of game map to start drawing on
-    
+
     for(i in 1:nrow(d$bs)){                                                                   # loop over all units in boardState
       if(!is.na(d$bs$sprite[i])){                                                             # only draw units with a defined sprite  
         rasterImage(eval(parse(text = d$bs$sprite[i])),                                       # cast sprite pointer (char) to variable, and draw
@@ -130,7 +152,11 @@ server <- function(input, output, session) {
   # 3.c. RENDER: OTHER
   #-------------------------------------------#
   output$set_txt1 <- renderText(paste("X resolution",gridSize[1]," Y Resolution",gridSize[2]))
-  
+  output$p1Score <- renderUI({actionButton("p1Score",paste(playerDef$label[1],playerDef$gold[1]),width="100%",style=paste("background-color:",playerDef$color[1]))}) # show score Player 1
+  output$p2Score <- renderUI({actionButton("p2Score",paste(playerDef$label[2],playerDef$gold[2]),width="100%",style=paste("background-color:",playerDef$color[2]))}) # show score Player 2
+  if(nrow(playerDef)>2){output$p3Score <- renderUI({actionButton("p3Score",paste(playerDef$label[3],playerDef$gold[3]),width="100%",style=paste("background-color:",playerDef$color[3]))})} # show score Player 3 (if exists)
+  if(nrow(playerDef)>3){output$p4Score <- renderUI({actionButton("p4Score",paste(playerDef$label[4],playerDef$gold[4]),width="100%",style=paste("background-color:",playerDef$color[4]))})} # show score Player 4 (if exists)
+  output$testhtml <- renderUI({HTML(paste("test", "str2", sep = '<br/>')) })
 }
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

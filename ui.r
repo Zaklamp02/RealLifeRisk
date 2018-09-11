@@ -55,8 +55,17 @@ ui <- dashboardPage(
                 ),
                 
                 #---------------------------#
-                # 3.a.2 MOVE BUTTONS
+                # 3.a.2 SCORE OVERVIEW
                 column(3,                                                                          # note that we are still in the same row, but we are defining a new column (of width=3, which together with the previous one makes exactly 12)
+                       fluidRow(
+                         column(3,uiOutput("p1Score"), style='padding:0px;'),                      # these will show the current scores
+                         column(3,uiOutput("p2Score"), style='padding:0px;'),
+                         column(3,uiOutput("p3Score"), style='padding:0px;'),
+                         column(3,uiOutput("p4Score"), style='padding:0px;')
+                       ),
+
+                       #---------------------------#
+                       # 3.a.3 MOVE BUTTONS
                        fluidRow(                                                                   # within this column we make a new row; you can repeat this indefinitely
                          column(4),                                                                # now we create a new column that acts just as whitespace
                          column(4,actionButton("btn_up", label = " up ",width='100%'))             # ... and another column that holds an 'up' button
@@ -75,47 +84,83 @@ ui <- dashboardPage(
                          column(4,actionButton("btn_endTurn", label = "End Turn", width='100%'))
                        ),
                        fluidRow(
-                         verbatimTextOutput("endOfTurnResult")
+                         box(title="End of Turn Results", status = "primary", width="100%", height=gridRes[2]-170,
+                             verbatimTextOutput("endOfTurnResult"),
+                             uiOutput("battleResult")
+                         )
                        )
                 )
               ),
               
               #------------------------------#
-              # 3.a.3 ACTION INPUT CONTROLS
+              # 3.a.4 ACTION INPUT CONTROLS
               fluidRow(
-                column(2, selectInput("a1p1", NULL, selected = 1, choices = pNames)),
-                column(2, selectInput("a1p2", NULL, selected = 1, choices = uNames)),
-                column(1, selectInput("a1p3", NULL, selected = 1, choices = 1:10)),
-                column(1, selectInput("a1p4", NULL, selected = 1, choices = yNames)),
-                column(1, selectInput("a1p5", NULL, selected = 1, choices = xNames)),
-                column(1, selectInput("a1p6", NULL, selected = 1, choices = yNames)),
-                column(1, selectInput("a1p7", NULL, selected = 1, choices = xNames)),
-                column(1, actionButton("a1submit", label = "action 1")),
-                column(2, verbatimTextOutput("a1result"))
-              ),
-              fluidRow(
-                column(2, selectInput("a2p1", NULL, selected = 1, choices = pNames)),
-                column(2, selectInput("a2p2", NULL, selected = 1, choices = uNames)),
-                column(1, selectInput("a2p3", NULL, selected = 1, choices = as.character(1:10))),
-                column(1, selectInput("a2p4", NULL, selected = 1, choices = yNames)),
-                column(1, selectInput("a2p5", NULL, selected = 1, choices = xNames)),
-                column(1, selectInput("a2p6", NULL, selected = 1, choices = yNames)),
-                column(1, selectInput("a2p7", NULL, selected = 1, choices = xNames)),
-                column(2, actionButton("a2submit", label = "action 2")),
-                column(2, textOutput("a2result"))
-              ),
-              fluidRow(
-                column(2, selectInput("a3p1", NULL, selected = 1, choices = pNames)),
-                column(2, selectInput("a3p2", NULL, selected = 1, choices = uNames)),
-                column(1, selectInput("a3p3", NULL, selected = 1, choices = as.character(1:10))),
-                column(1, selectInput("a3p4", NULL, selected = 1, choices = yNames)),
-                column(1, selectInput("a3p5", NULL, selected = 1, choices = xNames)),
-                column(1, selectInput("a3p6", NULL, selected = 1, choices = yNames)),
-                column(1, selectInput("a3p7", NULL, selected = 1, choices = xNames)),
-                column(2, actionButton("a3submit", label = "action 3")),
-                column(2, textOutput("a3result"))
+                column(3,
+                       box(title = "Player 1", status = "primary", width="100%",
+                           fluidRow(
+                             column(8,textInput("p1a1",NULL,"P1.")),
+                             actionButton("p1a1submit","",icon=icon("cog"))
+                           ),
+                           fluidRow(
+                             column(8,textInput("p1a2",NULL,"P1.")),
+                             actionButton("p1a2submit","",icon=icon("cog"))
+                           ),
+                           fluidRow(
+                             column(8,textInput("p1a3",NULL,"P1.")),
+                             actionButton("p1a3submit","",icon=icon("cog"))
+                           )
+                       )
+                ),
+                column(3,
+                       box(title = "Player 2", status = "primary", width="100%",
+                           fluidRow(
+                             column(8,textInput("p2a1",NULL,"P2.")),
+                             actionButton("p2a1submit","",icon=icon("cog"))
+                           ),
+                           fluidRow(
+                             column(8,textInput("p2a2",NULL,"P2.")),
+                             actionButton("p2a2submit","",icon=icon("cog"))
+                           ),
+                           fluidRow(
+                             column(8,textInput("p2a3",NULL,"P2.")),
+                             actionButton("p2a3submit","",icon=icon("cog"))
+                           )
+                       )
+                ),
+                column(3,
+                       box(title = "Player 3", status = "primary", width="100%",
+                           fluidRow(
+                             column(8,textInput("p3a1",NULL,"P3.")),
+                             actionButton("p3a1submit","",icon=icon("cog"))
+                           ),
+                           fluidRow(
+                             column(8,textInput("p3a2",NULL,"P3.")),
+                             actionButton("p3a2submit","",icon=icon("cog"))
+                           ),
+                           fluidRow(
+                             column(8,textInput("p3a3",NULL,"P3.")),
+                             actionButton("p3a3submit","",icon=icon("cog"))
+                           )
+                       )
+                ),
+                column(3,
+                       box(title = "Player 4", status = "primary", width="100%",
+                           fluidRow(
+                             column(8,textInput("p4a1",NULL,"P4.")),
+                             actionButton("p4a1submit","",icon=icon("cog"))
+                           ),
+                           fluidRow(
+                             column(8,textInput("p4a2",NULL,"P4.")),
+                             actionButton("p4a2submit","",icon=icon("cog"))
+                           ),
+                           fluidRow(
+                             column(8,textInput("p4a3",NULL,"P4.")),
+                             actionButton("p4a3submit","",icon=icon("cog"))
+                           )
+                       )
+                )
               )
-              
+                
       ),
       
       #-----------------------------------------#
@@ -167,6 +212,9 @@ ui <- dashboardPage(
               ),
               fluidRow(
                 DT::dataTableOutput("tbl_boardState")
+              ),
+              fluidRow(
+                tags$audio(src = "Nijmegen.mp3", type = "audio/mp3", autoplay = 1, controls = NA)
               )
       )
     )

@@ -54,10 +54,10 @@ shiny::runApp(app,host="0.0.0.0",port=4414)
 #  a report is generated that can help debug the app and find (processing)
 #  bottlenecks. Should only be used for debugging/testing
 #
-#library(profvis)
-#profvis({
-#  runApp()
-#})
+library(profvis)
+profvis({
+  runApp()
+})
 #
 ###############################################################################
 

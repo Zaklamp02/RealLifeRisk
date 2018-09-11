@@ -1,5 +1,5 @@
 # RealLifeRisk
-R-based version of turn-based strategy game Real Life Risk.
+Een op R gebaseerde versie van het turn-based strategie spel Real Life Risk.
 
 ###############################################################################
 # INSTALLATIE
@@ -11,10 +11,10 @@ Stappenplan:
 1) installeer R (https://cran.r-project.org/bin/windows/base/)
 2) installeer RStudio (https://www.rstudio.com/products/rstudio/download/)
 3) open RStudio, en installeer éénmalig de benodigde packages als volgt:
-    install.packages('shiny')
-    install.packages('shinydashboard')
-    install.packages('png')
-    install.packages('DT')
+    install.packages('shiny');
+    install.packages('shinydashboard');
+    install.packages('png');
+    install.packages('DT');
 4) open RealLifeRisk.proj
     als het goed is opent RStudio nu ui.r, app.r, server.r en global.r
     zo niet, klik file->open en open app.r
