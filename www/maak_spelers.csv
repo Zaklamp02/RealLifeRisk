@@ -1,0 +1,5 @@
+"Dit bestand bevat de definitie van de spelers. Nieuwe spelers kunnen worden toegevoegd door een nieuwe rij te maken en daar alle eigenschappen in te vullen. Player: interne variabele. Label: de naam van de speler. Gold: startkapitaal. Color: kleurcode, kent een brede definitie ('darkred','gold')",,,
+Player,Label,Gold,Color
+P1,Herten,3000,red
+P2,Sperwers,3000,yellow
+P3,Vossen,3000,blue

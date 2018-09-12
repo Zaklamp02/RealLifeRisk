@@ -25,23 +25,22 @@ library(shiny)
 library(shinydashboard)
 library(png)
 library(DT)
+library(magick)
+
+# Load key files
+unitDef   <- read.csv(file.path(getwd(),'www','maak_units.csv'),header=T,skip=1,stringsAsFactors = F)   # defines all units 
+playerDef <- read.csv(file.path(getwd(),'www','maak_spelers.csv'),header=T,skip=1,stringsAsFactors = F) # defines all players
 
 # Basic game settings
 scrnRes  = c(1600,600)                                                                     # screen resolution
-gridSize = c(20,10)                                                                        # size of game board 
-sprRes = rep(floor(scrnRes[1]*0.73/gridSize[1]),2)                                         # resolution of sprites/units (scaled to match screen resolution)
+gridSize = c(20,9)                                                                         # size of game board 
+sprRes   = rep(floor(scrnRes[1]*0.73/gridSize[1]),2)                                       # resolution of sprites/units (scaled to match screen resolution)
 gridRes  = gridSize*sprRes                                                                 # resolution of gameboard
-yNames   = c(LETTERS, sapply(LETTERS, function(x) paste0(x, LETTERS)))[1:gridSize[2]]                                                          # names of Y axis
+yNames   = c(LETTERS, sapply(LETTERS, function(x) paste0(x, LETTERS)))[1:gridSize[2]]      # names of Y axis                                                    # names of Y axis
 xNames   = as.character(1:gridSize[1])                                                     # names of X axis
-uNames   = c("T","P","A")                                                                  # unit names (abbreviated)
-pNames   = c("P1","P2","P3")                                                               # names of players (abbreviated)
-
-# Load images & sprites
-base_map          = readPNG(file.path(getwd(),'www','base_map.png'),         native=T)     # read some files
-spr_p1_tank       = readPNG(file.path(getwd(),'www','spr_p1_tank.png'),      native=T)     # should be automated later on based on 'unitDef'
-spr_p1_platoon    = readPNG(file.path(getwd(),'www','spr_p1_platoon.png'),   native=T) 
-spr_p1_artillery  = readPNG(file.path(getwd(),'www','spr_p1_artillery.png'), native=T)
-spr_p2_tank       = readPNG(file.path(getwd(),'www','spr_p2_tank.png'),      native=T) 
+uNames   = unitDef$Unit                                                                    # unit names (abbreviated)
+pNames   = playerDef$Player                                                                # names of players (abbreviated)
+startIni = 15                                                                              # RANDOMLY initialize the board with 15 units
 
 # Basic board definition
 boardDef = data.frame(xPos     = rep(xNames,each=gridSize[2]),                             # all possible X coördinates (in grid)
@@ -51,33 +50,30 @@ boardDef = data.frame(xPos     = rep(xNames,each=gridSize[2]),                  
                       water    = rep('no',gridSize[1]*gridSize[2]),                        # boolean if location is 'water'
                       stringsAsFactors=F)                                                  # make sure to encode as 'char' instead of 'factor'
 
-# Basic unit definition
-unitDef = read.csv(file.path(getwd(),'www','unitDef.csv'),header=T,skip=1,stringsAsFactors = F)
+# Create initial board state
+boardState <- data.frame(xPos=sample(1:length(xNames),8),
+                         yPos=sample(1:length(yNames),8))
+boardState$xRes <- boardState$xPos * sprRes[1]-sprRes[1]
+boardState$yRes <- boardState$yPos * sprRes[2]-sprRes[2]
+boardState$xPos <- xNames[boardState$xPos]
+boardState$yPos <- yNames[boardState$yPos]
+boardState$player <- sample(pNames,8,replace=T)
+boardState$unit   <- sample(uNames,8,replace=T)
+boardState$sprite <- paste0(boardState$unit,boardState$player)
+boardState$quantity <- sample(1:4,8,replace=T)
 
-# Basic player definition
-playerDef = data.frame(player = c("P1","P2","P3"),
-                       label = c("Herten","Sperwers","Vossen"),
-                       gold   = c(15000,15000,15000),
-                       color  = c("blue","yellow","red"),
-                       stringsAsFactors=F)
+# Load images & sprites
+spr <- list()                                                                              # this will hold all sprites
+spr[['board']] = readPNG(file.path(getwd(),'www','base_map.png'),native=T)                 # read gameboard
+for(i in 1:nrow(unitDef)){                                                                 # loop over units
+  sprTmp <- image_read(file.path(getwd(),'www',paste0('spr_',unitDef$Label[i],'.png')))    # read sprite for current unit
+  for(j in 1:nrow(playerDef)){                                                             # loop over players
+    spr[[paste0(unitDef$Unit[i],playerDef$Player[j])]] <- sprTmp %>%                       # make copy of unit sprite
+      image_fill(color=playerDef$Color[j],fuzz=20) %>%                                     # set background of sprite to player color
+      image_scale(paste0("x",sprRes[1]))
+  }
+}
 
-# Create initial board state                                                               # (this is probably about the ugliest 15 lines of code you will ever see)
-boardState = data.frame(xPos     = rep(xNames,each=gridSize[2]),                           # start by creating WAY too much  
-                        yPos     = rep(yNames,gridSize[1]),                                # and anyhow, this should come from a text file
-                        xRes     = rep(1:gridSize[1],each=gridSize[2])*sprRes[1]-sprRes[1],
-                        yRes     = rep(1:gridSize[2],gridSize[1])*sprRes[2]-sprRes[2],
-                        player   = NA,                                                     # oh, now we're creating empty variables as well?
-                        unit     = NA,
-                        sprite   = NA,
-                        quantity = rep(0,gridSize[1]*gridSize[2]),
-                        stringsAsFactors=F)
-
-boardState[1,c('player','unit','quantity','sprite')] <- c('P1','T',1,'spr_p1_tank')        # now we start to actually draw some units
-boardState[8,c('player','unit','quantity','sprite')] <- c('P1','P',1,'spr_p1_platoon')
-boardState[12,c('player','unit','quantity','sprite')] <- c('P2','T',1,'spr_p2_tank')
-
-boardState$quantity <- as.numeric(boardState$quantity)                                     # this should not be necessary
-boardState <- boardState[!is.na(boardState$player),]                                       # and finish by undoing ALL the work we just did
 
 #-------------------------------------------#
 # 1. CHECK ACTION
@@ -219,8 +215,9 @@ create_unit <- function(boardState,player,unit,quantity,x,y){
   boardState[nrow(boardState),'xRes']      <- as.numeric(x)*sprRes[1]-sprRes[1]
   boardState[nrow(boardState),'yRes']      <- which(LETTERS %in% y) * sprRes[2]-sprRes[2]
   boardState[nrow(boardState),'unit']      <- unit
-  boardState[nrow(boardState),'quantity']  <- as.numeric(quantity)
   boardState[nrow(boardState),'player']    <- player
+  boardState[nrow(boardState),'sprite']    <- paste0(unit,player)
+  boardState[nrow(boardState),'quantity']  <- as.numeric(quantity)
   
 #  spr <- unitDef[unitDef$unit==unit,'sprite']                                                # look up correct sprite pointer in unitDef
 #  spr <- sub('p1',tolower(player),spr)                                                       # substitute correct player identifier in sprite pointer
@@ -294,8 +291,8 @@ battle_engine <- function(bs, x, y){
     fighters[rdefend,unitDef$Unit] <- fighters[rdefend,unitDef$Unit] * (sdefend-lattack)/sdefend
     fighters[rdefend,uattack]      <- 0
     
-    playerDef$gold[playerDef$player==pattack] <<- playerDef$gold[playerDef$player==pattack] + ldefend*unitDef$KillBonus[unitDef$Unit==udefend]
-    playerDef$gold[playerDef$player==pdefend] <<- playerDef$gold[playerDef$player==pdefend] + lattack*unitDef$KillBonus[unitDef$Unit==uattack]
+    playerDef$Gold[playerDef$Player==pattack] <<- playerDef$Gold[playerDef$Player==pattack] + ldefend*unitDef$KillBonus[unitDef$Unit==udefend]
+    playerDef$Gold[playerDef$Player==pdefend] <<- playerDef$Gold[playerDef$Player==pdefend] + lattack*unitDef$KillBonus[unitDef$Unit==uattack]
 
     fighters <- fighters[fighters$quantity>0,]
     
@@ -371,7 +368,7 @@ parse_action <- function(action){
 
 update_score_buttons <- function(session){                              # function will only work for 1 session at a time
   for(i in 1:nrow(playerDef)){                                          # for every player ...
-    updateActionButton(session,paste0("p",i,"Score"),label=paste(playerDef$label[i],playerDef$gold[i])) # ... update the gold-button
+    updateActionButton(session,paste0("p",i,"Score"),label=paste(playerDef$Label[i],playerDef$Gold[i])) # ... update the gold-button
   }
 }
 

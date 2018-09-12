@@ -125,11 +125,11 @@ server <- function(input, output, session) {
     
     par(mar=rep(0,4))                                                                         # set figure margins to 0
     plot.window(xlim=c(0,gridRes[1]),ylim=c(0,gridRes[2]))                                    # create a window with correct size
-    rasterImage(base_map,0,0,gridRes[1],gridRes[2])                                           # create 'base layer' of game map to start drawing on
+    rasterImage(spr[['board']],0,0,gridRes[1],gridRes[2])                                     # create 'base layer' of game map to start drawing on
 
     for(i in 1:nrow(d$bs)){                                                                   # loop over all units in boardState
       if(!is.na(d$bs$sprite[i])){                                                             # only draw units with a defined sprite  
-        rasterImage(eval(parse(text = d$bs$sprite[i])),                                       # cast sprite pointer (char) to variable, and draw
+        rasterImage(spr[[d$bs$sprite[i]]],                                                    # cast sprite pointer (char) to variable, and draw
                     d$bs[i,'xRes'],                                                           # define correct x1,y1,x2,y2 coördinates (in pixels)
                     d$bs[i,'yRes'],
                     d$bs[i,'xRes']+sprRes[1],
@@ -156,10 +156,10 @@ server <- function(input, output, session) {
   #-------------------------------------------#
   output$set_txt1 <- renderText(paste("X resolution",gridSize[1]," Y Resolution",gridSize[2]))
   
-#  output$p1Score <- renderUI({actionButton("p1Score",paste(playerDef$label[1],playerDef$gold[1]),width="100%",style=paste("background-color:",playerDef$color[1]))}) # show score Player 1
-  output$p2Score <- renderUI({actionButton("p2Score",paste(playerDef$label[2],playerDef$gold[2]),width="100%",style=paste("background-color:",playerDef$color[2]))}) # show score Player 2
-  if(nrow(playerDef)>2){output$p3Score <- renderUI({actionButton("p3Score",paste(playerDef$label[3],playerDef$gold[3]),width="100%",style=paste("background-color:",playerDef$color[3]))})} # show score Player 3 (if exists)
-  if(nrow(playerDef)>3){output$p4Score <- renderUI({actionButton("p4Score",paste(playerDef$label[4],playerDef$gold[4]),width="100%",style=paste("background-color:",playerDef$color[4]))})} # show score Player 4 (if exists)
+  output$p1Score <- renderUI({actionButton("p1Score",paste(playerDef$Label[1],playerDef$Gold[1]),width="100%",style=paste("background-color:",playerDef$Color[1]))}) # show score Player 1
+  output$p2Score <- renderUI({actionButton("p2Score",paste(playerDef$Label[2],playerDef$Gold[2]),width="100%",style=paste("background-color:",playerDef$Color[2]))}) # show score Player 2
+  if(nrow(playerDef)>=3){output$p3Score <- renderUI({actionButton("p3Score",paste(playerDef$Label[3],playerDef$Gold[3]),width="100%",style=paste("background-color:",playerDef$Color[3]))})} # show score Player 3 (if exists)
+  if(nrow(playerDef)>=4){output$p4Score <- renderUI({actionButton("p4Score",paste(playerDef$Label[4],playerDef$Gold[4]),width="100%",style=paste("background-color:",playerDef$Color[4]))})} # show score Player 4 (if exists)
   output$testhtml <- renderUI({HTML(paste("test", "str2", sep = '<br/>')) })
   
 }

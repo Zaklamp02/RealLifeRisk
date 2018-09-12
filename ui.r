@@ -60,7 +60,7 @@ ui <- dashboardPage(
                        fluidRow(
                          lapply(1:nrow(playerDef), function(i) {                                   # this will create a 'score button' for each player
                            column(12/nrow(playerDef), style='padding:0px;',                        # create column of 1/nplayers
-                                  actionButton(paste0("p",i,"Score"),label=paste(playerDef$label[i],playerDef$gold[i]),style=paste("background-color:",playerDef$color[i]),width='100%')
+                                  actionButton(paste0("p",i,"Score"),label=paste(playerDef$Label[i],playerDef$Gold[i]),style=paste("background-color:",playerDef$Color[i]),width='100%')
                            )
                          })
                        ),

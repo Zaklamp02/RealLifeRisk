@@ -24,9 +24,11 @@ shiny::runApp(app,host="0.0.0.0",port=4414)
 #   TO DO
 ###############################################################################
 #
+#   GENERAL
+#   - improve end of turn sequence
+#   - add save/continue / turn counters
+#
 #   GLOBAL
-#   - create actual battle engine
-#   - create path_finder function (to find optimal route for move actions)
 #   - create game_tracker function (to log game progression/statistics)
 #   - create game_score function (to keep track of/assign scores)
 #   - improve check_action
