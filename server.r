@@ -62,17 +62,18 @@ server <- function(input, output, session) {
       act$msg   <- chk$msg
     }
 
-    if(act$type=="succes"){                                                                       # IF the action is valid (i.e. success)
+    if(act$type=="succes"){                                                                    # IF the action is valid (i.e. success)
       if(is.na(act$x2) & is.na(act$y2)){
         d$bs <- create_unit(d$bs,act$player,act$unit,act$quantity,act$x1,act$y1)
         act$msg <- 'unit gekocht'
       } else {
-        d$bs <- do_move(d$bs,act$player,act$unit,act$quantity,act$x1,act$y1,act$x2,act$y2) # THEN actually perform the move
-        act$msg <- 'unit succesvol geplaatst'
+        move <- execute_move(d$bs,act$player,act$unit,act$quantity,act$x1,act$y1,act$x2,act$y2)     # THEN actually perform the move
+        act$msg <- move$msg
+        d$bs <- move$bs
       }
     }
     
-    output$endOfTurnResult <- renderText(paste(act))
+    output$endOfTurnResult <- renderText(paste(act$msg))
     updateActionButton(session,"p1a1submit",label=act$type)
   })
   
@@ -84,20 +85,22 @@ server <- function(input, output, session) {
     
     #-------------------------------------------#
     # 2.c.1. CHECK/EXECUTE BATTLES
-    for(x in unique(d$bs$xPos)){                                                                      # loop over all x coördinates
-      for(y in unique(d$bs$yPos)){                                                                    # loop over all y coördinates
-        if( any(d$bs$xPos==x & d$bs$yPos==y) ){                                               # check if ANY units occupy the current square
+    
+    for(x in unique(d$bs$xPos)){                                                              # loop over all x coördinates
+      for(y in unique(d$bs$yPos)){                                                            # loop over all y coördinates
+        if(any(d$bs$xPos==x & d$bs$yPos==y) ){                                                # check if ANY units occupy the current square
           if(length(unique(d$bs$player[d$bs$xPos==x & d$bs$yPos==y]))>1){                     # check if >1 PLAYER occupies the current square
-            battleOutcome <- battle_engine(d$bs,x,y)                                                       # if so, trigger battle engine
-            msg <- paste(msg,'battle at: ',x,y,' winner: ',unique(d$bs$player[d$bs$xPos==x & d$bs$yPos==y]),sep='') # log the outcome
+            battleOutcome <- battle_engine(d$bs,x,y)                                          # if so, trigger battle engine
             msg2 <- battleOutcome$msg
             d$bs <- battleOutcome$boardState
+            msg <- paste(msg,'battle at: ',x,y,' winner: ',unique(d$bs$player[d$bs$xPos==x & d$bs$yPos==y]),sep='') # log the outcome
+            output$battleResult <- renderUI({HTML(msg2)})
           }
         }
       }
     }
+    update_score_buttons(session)                                                             # this will simply overwrite the current value
     output$endOfTurnResult <- renderText({msg})                                               # report back on the outcome of the turn
-    output$battleResult <- renderUI({HTML(msg2)})
   })
   
   #-------------------------------------------#
@@ -152,11 +155,13 @@ server <- function(input, output, session) {
   # 3.c. RENDER: OTHER
   #-------------------------------------------#
   output$set_txt1 <- renderText(paste("X resolution",gridSize[1]," Y Resolution",gridSize[2]))
-  output$p1Score <- renderUI({actionButton("p1Score",paste(playerDef$label[1],playerDef$gold[1]),width="100%",style=paste("background-color:",playerDef$color[1]))}) # show score Player 1
+  
+#  output$p1Score <- renderUI({actionButton("p1Score",paste(playerDef$label[1],playerDef$gold[1]),width="100%",style=paste("background-color:",playerDef$color[1]))}) # show score Player 1
   output$p2Score <- renderUI({actionButton("p2Score",paste(playerDef$label[2],playerDef$gold[2]),width="100%",style=paste("background-color:",playerDef$color[2]))}) # show score Player 2
   if(nrow(playerDef)>2){output$p3Score <- renderUI({actionButton("p3Score",paste(playerDef$label[3],playerDef$gold[3]),width="100%",style=paste("background-color:",playerDef$color[3]))})} # show score Player 3 (if exists)
   if(nrow(playerDef)>3){output$p4Score <- renderUI({actionButton("p4Score",paste(playerDef$label[4],playerDef$gold[4]),width="100%",style=paste("background-color:",playerDef$color[4]))})} # show score Player 4 (if exists)
   output$testhtml <- renderUI({HTML(paste("test", "str2", sep = '<br/>')) })
+  
 }
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

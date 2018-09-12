@@ -58,10 +58,11 @@ ui <- dashboardPage(
                 # 3.a.2 SCORE OVERVIEW
                 column(3,                                                                          # note that we are still in the same row, but we are defining a new column (of width=3, which together with the previous one makes exactly 12)
                        fluidRow(
-                         column(3,uiOutput("p1Score"), style='padding:0px;'),                      # these will show the current scores
-                         column(3,uiOutput("p2Score"), style='padding:0px;'),
-                         column(3,uiOutput("p3Score"), style='padding:0px;'),
-                         column(3,uiOutput("p4Score"), style='padding:0px;')
+                         lapply(1:nrow(playerDef), function(i) {                                   # this will create a 'score button' for each player
+                           column(12/nrow(playerDef), style='padding:0px;',                        # create column of 1/nplayers
+                                  actionButton(paste0("p",i,"Score"),label=paste(playerDef$label[i],playerDef$gold[i]),style=paste("background-color:",playerDef$color[i]),width='100%')
+                           )
+                         })
                        ),
 
                        #---------------------------#
@@ -95,72 +96,25 @@ ui <- dashboardPage(
               #------------------------------#
               # 3.a.4 ACTION INPUT CONTROLS
               fluidRow(
-                column(3,
-                       box(title = "Player 1", status = "primary", width="100%",
-                           fluidRow(
-                             column(8,textInput("p1a1",NULL,"P1.")),
-                             actionButton("p1a1submit","",icon=icon("cog"))
-                           ),
-                           fluidRow(
-                             column(8,textInput("p1a2",NULL,"P1.")),
-                             actionButton("p1a2submit","",icon=icon("cog"))
-                           ),
-                           fluidRow(
-                             column(8,textInput("p1a3",NULL,"P1.")),
-                             actionButton("p1a3submit","",icon=icon("cog"))
-                           )
-                       )
-                ),
-                column(3,
-                       box(title = "Player 2", status = "primary", width="100%",
-                           fluidRow(
-                             column(8,textInput("p2a1",NULL,"P2.")),
-                             actionButton("p2a1submit","",icon=icon("cog"))
-                           ),
-                           fluidRow(
-                             column(8,textInput("p2a2",NULL,"P2.")),
-                             actionButton("p2a2submit","",icon=icon("cog"))
-                           ),
-                           fluidRow(
-                             column(8,textInput("p2a3",NULL,"P2.")),
-                             actionButton("p2a3submit","",icon=icon("cog"))
-                           )
-                       )
-                ),
-                column(3,
-                       box(title = "Player 3", status = "primary", width="100%",
-                           fluidRow(
-                             column(8,textInput("p3a1",NULL,"P3.")),
-                             actionButton("p3a1submit","",icon=icon("cog"))
-                           ),
-                           fluidRow(
-                             column(8,textInput("p3a2",NULL,"P3.")),
-                             actionButton("p3a2submit","",icon=icon("cog"))
-                           ),
-                           fluidRow(
-                             column(8,textInput("p3a3",NULL,"P3.")),
-                             actionButton("p3a3submit","",icon=icon("cog"))
-                           )
-                       )
-                ),
-                column(3,
-                       box(title = "Player 4", status = "primary", width="100%",
-                           fluidRow(
-                             column(8,textInput("p4a1",NULL,"P4.")),
-                             actionButton("p4a1submit","",icon=icon("cog"))
-                           ),
-                           fluidRow(
-                             column(8,textInput("p4a2",NULL,"P4.")),
-                             actionButton("p4a2submit","",icon=icon("cog"))
-                           ),
-                           fluidRow(
-                             column(8,textInput("p4a3",NULL,"P4.")),
-                             actionButton("p4a3submit","",icon=icon("cog"))
-                           )
-                       )
-                )
+                lapply(1:nrow(playerDef), function(i) {
+                  column(12/nrow(playerDef),
+                         box(title = paste("Player",i), status = "primary", width="100%",
+                             fluidRow(
+                               column(8,textInput(paste0("p",i,"a1"),NULL,paste0("P",i,"."))),
+                               actionButton(paste0("p",i,"a1submit"),"",icon=icon("cog"))
+                             ),
+                             fluidRow(
+                               column(8,textInput(paste0("p",i,"a2"),NULL,paste0("P",i,"."))),
+                               actionButton(paste0("p",i,"a2submit"),"",icon=icon("cog"))
+                             ),
+                             fluidRow(
+                               column(8,textInput(paste0("p",i,"a2"),NULL,paste0("P",i,"."))),
+                               actionButton(paste0("p",i,"a2submit"),"",icon=icon("cog"))
+                             )
+                         )
+                  )
+                })
               )
-                
       ),
       
       #-----------------------------------------#

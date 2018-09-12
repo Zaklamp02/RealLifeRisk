@@ -127,36 +127,80 @@ check_action <- function(boardState,player,unit,quantity,x1,y1,x2,y2){
 }
 
 #-------------------------------------------#
-# 2. DO MOVE
+# 2. EXECUTE MOVE
 #-------------------------------------------#
 #
 # Function does exactly what the name implies. It performs a 'move' action. It will take the specified unit,
-# remove it from the start location and add it to the destination. It also does some basic checks to make sure
-# the boardState remains valid in edge cases. Make sure to check_action first!!!
+# move it from the start location along a specified path to its destination. It also does some basic checks to make sure
+# the boardState remains valid in edge cases. A Path is defined as a series of up/down/left/right movements. These can
+# be denoted as either u-d-l-r or n-o-z-w (noord oost zuid west)
+#
+# IMPORTANT: Make sure to check_action first!!!
 #
 #-------------------------------------------#
 
-do_move <- function(boardState,player,unit,quantity,x1,y1,x2,y2){
+execute_move <- function(tbs,player,unit,quantity,x1,y1,x2,path){
+  msg <- 'unit succesvol verplaatst naar: '
   
-  rowFrom = which(boardState$xPos==x1 & boardState$yPos==y1 & boardState$unit==unit & boardState$player==player) # find the row where unit is currently specified
+  if(unit == 'ALL'){
+    rowFrom = which(tbs$xPos==x1 & tbs$yPos==y1 & tbs$player==player)          # find the row where unit is currently specified
+  } else {
+    rowFrom = which(tbs$xPos==x1 & tbs$yPos==y1 & tbs$unit==unit & tbs$player==player) # find the row where unit is currently specified
+    
+    if(quantity < tbs$quantity[rowFrom]){                                      # if there are more units than player wants to move ...
+      tbs <- rbind(tbs,tbs[rowFrom,])                                          # ... then make a copy of the unit ...
+      tbs$quantity[nrow(tbs)] <- tbs$quantity[nrow(tbs)] - quantity            # ... whith a quantity equal to the units remaining ...
+      tbs$quantity[rowFrom]   <- quantity                                      # ... and set quantity of the 'moving row' equal to quantity specified
+    }
+  }
+
+  path <- toupper(path)                                                        # make sure all characters are in upper case
   
-  # Get unit to destination
-  if(length(boardState[boardState$xPos==x2 & boardState$yPos==y2 & boardState$unit==unit])==1){ # check if unit already exists on target
-    rowTo = boardState[boardState$xPos==x2 & boardState$yPos==y2 & boardState$unit==unit]       # if yes, merge with target
-    boardState[rowTo,'quantity'] <- boardState[rowTo,'quantity'] + quantity                     # so only update the quantity
-  } else {                                                                                      # if not, a new row needs to be created
-    boardState <- create_unit(boardState,player,unit,quantity,x2,y2)
+  for(i in 1:nchar(path)){                                                     # loop over the entire path
+    nextLoc <- substr(path,i,i)                                                # find current step in the path
+    
+    if(nextLoc == 'U' | nextLoc == 'N'){                                       # then move unit up
+      yInd <- which(yNames %in% tbs$yPos[rowFrom])                             # find index of location on Y axis
+      if(yInd+1 <= length(yNames)){                                            # then position is valid, so execute step
+        tbs$yPos[rowFrom] <- yNames[yInd+1]                                    # update location (coördinate)
+        tbs$yRes[rowFrom] <- tbs$yRes[rowFrom] + sprRes[2]                     # update location (in pixels)
+      }
+    } else if(nextLoc == 'D' | nextLoc == 'Z'){
+      yInd <- which(yNames %in% tbs$yPos[rowFrom])                             # now do the same for 'down/south' movements
+      if(yInd >= 2){                                            
+        tbs$yPos[rowFrom] <- yNames[yInd-1]                   
+        tbs$yRes[rowFrom] <- tbs$yRes[rowFrom] - sprRes[2]
+      }
+    } else if(nextLoc == 'L' | nextLoc == 'W'){
+      xInd <- which(xNames %in% tbs$xPos[rowFrom])                             # now do the same for 'left/west' movements           
+      if(xInd >= 2){                                             
+        tbs$xPos[rowFrom] <- xNames[xInd-1]                   
+        tbs$xRes[rowFrom] <- tbs$xRes[rowFrom] - sprRes[1]
+      }
+    } else if(nextLoc == 'R' | nextLoc == 'O'){                                # now do the same for 'right/east' movements
+      xInd <- which(xNames %in% tbs$xPos[rowFrom])                      
+      if(xInd+1 <= length(xNames)){                                     
+        tbs$xPos[rowFrom] <- xNames[xInd+1]                   
+        tbs$xRes[rowFrom] <- tbs$xRes[rowFrom] + sprRes[1]
+      }
+    }
+    
+    if( length(unique(tbs$player[tbs$xPos==tbs$xPos[rowFrom] & tbs$yPos==tbs$yPos[rowFrom]]))>1 ){ # if there are opponents on the current square
+      msg <- gsub('succesvol verplaatst naar','gestopt op',msg)                # update the message to reflect move has not been completely completed
+      break                                                                    # stop further movement
+    }
   }
   
-  # Remove units from start location
-  if(boardState[rowFrom,'quantity'] > quantity){                                                # check if any units should remain
-    boardState[rowFrom,'quantity'] <- boardState[rowFrom,'quantity'] - quantity                 # if yes, only update quantity
-  } else {                                                                                      # if no, remove row
-    boardState <- boardState[-rowFrom,]
-  }
+  tbs <- setNames(aggregate(tbs[, c("quantity")],                              # remove any duplicate rows, and return boardstate
+                            tbs[, names(tbs)[!names(tbs) %in% c("quantity")]], # this will take all rows that are identical
+                            FUN = sum, na.rm = TRUE),                          # ... and collapse them while summing the quantity
+                  c(names(tbs)[!names(tbs) %in% c("quantity")],"quantity"))    # finally, make sure column names are correct
   
-  return(boardState)
+  msg <- paste(msg,tbs$xPos[rowFrom],tbs$yPos[rowFrom])                        # add destination coördinates to output message
+
+  return(list(bs=tbs,msg=msg))
 }
+
 
 #-------------------------------------------#
 # 3. CREATE UNIT
@@ -175,7 +219,7 @@ create_unit <- function(boardState,player,unit,quantity,x,y){
   boardState[nrow(boardState),'xRes']      <- as.numeric(x)*sprRes[1]-sprRes[1]
   boardState[nrow(boardState),'yRes']      <- which(LETTERS %in% y) * sprRes[2]-sprRes[2]
   boardState[nrow(boardState),'unit']      <- unit
-  boardState[nrow(boardState),'quantity']  <- quantity
+  boardState[nrow(boardState),'quantity']  <- as.numeric(quantity)
   boardState[nrow(boardState),'player']    <- player
   
 #  spr <- unitDef[unitDef$unit==unit,'sprite']                                                # look up correct sprite pointer in unitDef
@@ -186,29 +230,149 @@ create_unit <- function(boardState,player,unit,quantity,x,y){
 }
 
 #-------------------------------------------#
-# 4. DO BATTLE
+# 4. BATTLE ENGInE
 #-------------------------------------------#
 #
 # This function resolves fights on the board
 # a 'Fight' is defined as any square that is
 # occupied by units from more than 1 player
 #
-# !!! 
-# currently this function RANDOMLY selects
-# a winner out of competing players. I.e.
-# there is no logic/rules at all!
+# The order of fighting is determined by
+# the relative attack power of partaking units
+# The fight is stopped when highest relative
+# attacking power <1, meaning there is no unit
+# left that can take out another unit.
 #
 #-------------------------------------------#
 
-do_battle <- function(boardState,x,y){
+battle_engine <- function(bs, x, y){
   
-  r <- boardState$xPos==x & boardState$yPos==y                                               # get (logical) of all rows in boardState involved in the action
-  fight <- boardState[r,]                                                                    # select relevant data
-  p <- unique(fight$player)                                                                  # find which players are involved
-  winner <- sample(p,1)                                                                      # select random player as the winner
-  boardState <- boardState[!r | boardState$player==winner,]                                  # delete all data from other users on selected square
+  fight <- bs[bs$xPos == x & bs$yPos == y,]                                                # select all units on square
+  done  <- F                                                                               # used later on to define the end of the battle
+  turn  <- 0                                                                               # used later to check how many turns were taken
+  fighters <- NULL                                                                         # convenience variable
+  msg   <- paste0("Uitslag gevecht ",y,x)                                                  # starts an output message
+  
+  for(i in 1:nrow(fight)){                                                                 # loop over all units in the fight
+    pcurrent <- fight$player[i]                                                            # find current player
+    ocurrent <- fight$unit[fight$player != pcurrent]                                       # find possible opponents
+    ucurrent <- unitDef[unitDef$Unit==fight$unit[i],unitDef$Unit] * fight$quantity[i]      # find relative strength against all possible opponents
+    ucurrent[!names(ucurrent) %in% ocurrent] <- 0                                          # set strengths against non-existing opponents to 0
+    fighters <- rbind(fighters, cbind(fight[i,c('player','unit','quantity')],ucurrent))    # add this information to current fighter sheet
+  }
+  
+  while(done==F){                                                                          # initiate a round of fighting the fight
+    turn    <- turn+1                                                                      # check how long we have been fighting
+    loc     <- which(fighters[,-(1:3)]==max(fighters[,-(1:3)]),arr.ind = T)                # find location of highest attack power
+    loc     <- loc[sample(nrow(loc),1),]                                                   # in case of multiple equals, choose randomly
     
-  return(boardState)
+    # allocate convenience variables [SHOULD IMPROVE EFFICIENCY!!!!]
+    rattack <- loc[1]
+    pattack <- fighters$player[loc[1]]                                                     # find attacking player
+    uattack <- fighters$unit[loc[1]]
+    qattack <- fighters$quantity[loc[1]]
+    sattack <- fighters[loc[1],3+loc[2]]
+    rdefend <- which(fighters$player != pattack & fighters$unit==names(fighters)[3+loc[2]])# find defending unit
+    rdefend <- ifelse(length(rdefend==1),rdefend,sample(rdefend,1))                        # in case of multiple defending units, choose randmoly
+    pdefend <- fighters$player[rdefend]
+    udefend <- fighters$unit[rdefend]
+    qdefend <- fighters$quantity[rdefend]
+    sdefend <- fighters[rdefend,uattack]
+    
+    msg <- paste(msg,paste(qattack,uattack,'van',pattack,'vs',qdefend,udefend,'van',pdefend), sep = '<br/>')
+    
+    # now actually start evaluating the fight
+    ldefend <- min(fighters$quantity[rdefend],floor(sattack))
+    lattack <- min(fighters$quantity[rattack],floor(sdefend))
+    
+    fighters$quantity[rdefend] <- fighters$quantity[rdefend] - ldefend
+    fighters$quantity[rattack] <- fighters$quantity[rattack] - lattack
+    
+    fighters[rattack,unitDef$Unit] <- fighters[rattack,unitDef$Unit] * (sattack-ldefend)/sattack
+    fighters[rattack,3+loc[2]]     <- 0
+    
+    fighters[rdefend,unitDef$Unit] <- fighters[rdefend,unitDef$Unit] * (sdefend-lattack)/sdefend
+    fighters[rdefend,uattack]      <- 0
+    
+    playerDef$gold[playerDef$player==pattack] <<- playerDef$gold[playerDef$player==pattack] + ldefend*unitDef$KillBonus[unitDef$Unit==udefend]
+    playerDef$gold[playerDef$player==pdefend] <<- playerDef$gold[playerDef$player==pdefend] + lattack*unitDef$KillBonus[unitDef$Unit==uattack]
+
+    fighters <- fighters[fighters$quantity>0,]
+    
+    if(nrow(fighters)==0){                                                              # then no players left
+      done=T
+    } else if(length(unique(fighters$player[fighters$quantity>0]))==1){                 # then only 1 player left
+      done=T
+    } else if(all(fighters[,-c(1:3)]==0)){                                              # then 2+ players left, but all units have 0 attacking power vs eachother
+      done=T                                                                            # maybe then you want to reset attacking power?
+    } else if(turn>50){
+      done=T                                                                            # force a break if there is no winner after 50 turns
+    }
+  }
+  
+  bs <- rbind(bs[bs$xPos != x | bs$yPos != y,],bs[rownames(fighters),])
+
+  return(list(boardState=bs,msg=msg))
+}
+
+#-------------------------------------------#
+# 5. PARSE ACTION
+#-------------------------------------------#
+#
+# This function takes in an action (written in
+# any acceptable format), and decomposes it
+# into relevant action components. It is the
+# basic introduction into performing any action
+# 
+# IMPORTANT: This function will only break up
+# an action into components. This should be 
+# followed by a 'check_action' function, to 
+# evaluate whether an action is actually valid.
+#
+#-------------------------------------------#
+
+parse_action <- function(action){
+  out <- list()
+  if(is.character(action)){                                    # then input is in character format
+    act <- unlist(strsplit(action,'[.]'))                      # try to split on '.' (CAN IMPROVE LATER!!!)
+    if(length(act)<3){                                         # then too few elements
+      out$type <- 'fout'                                       # log short message
+      out$msg  <- 'te weinig elementen'                        # log long message
+    } else if(length(act)>4){                                  # then too many elements
+      out$type <- 'fout'
+      out$msg  <- 'teveel elementen'
+    } else{                                                    # then either 3 or 4 elements
+      out$type     <- 'succes'                                 # log that parsing was successful
+      out$msg      <- ifelse(length(act)==3,'speciale actie','verplaatsing')
+      out$player   <- act[1]                                   # log all elements
+      out$unit     <- gsub('\\d','', act[2])
+      out$quantity <- gsub('\\D','', act[2])
+      out$y1       <- gsub('\\d','', act[3])
+      out$x1       <- gsub('\\D','', act[3])
+      out$y2       <- gsub('\\d','', act[4])
+      out$x2       <- gsub('\\D','', act[4])
+    }
+  } else {
+    out$type <- 'fout'
+    out$msg  <- 'onbekend formaat'
+  }
+  return(out)
+}
+
+#-------------------------------------------#
+# 6. UPDATE SCORE BUTTONS
+#-------------------------------------------#
+#
+# Minor function to automatically update
+# all score buttons on screen. May be improved
+# in the future by using reactive global variables
+#
+#-------------------------------------------#
+
+update_score_buttons <- function(session){                              # function will only work for 1 session at a time
+  for(i in 1:nrow(playerDef)){                                          # for every player ...
+    updateActionButton(session,paste0("p",i,"Score"),label=paste(playerDef$label[i],playerDef$gold[i])) # ... update the gold-button
+  }
 }
 
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!#
@@ -236,94 +400,6 @@ evaluate_action <- function(boardState,action){
   
 }
 
-# PARSE ACTION
-# idea is that you give this an action in any acceptable definition,
-# which is then parsed and returned in an intelligent manner
-
-parse_action <- function(action){
-  out <- list()
-  if(is.character(action)){                                    # then input is in character format
-    act <- unlist(strsplit(action,'[.]'))                      # try to split on '.' (CAN IMPROVE LATER!!!)
-    if(length(act)<3){                                         # then too few elements
-      out$type <- 'fout'                                       # log short message
-      out$msg  <- 'te weinig elementen'                        # log long message
-    } else if(length(act)>4){                                  # then too many elements
-      out$type <- 'fout'
-      out$msg  <- 'teveel elementen'
-    } else{                                                    # then either 3 or 4 elements
-      out$type     <- 'succes'                                   # log that parsing was successful
-      out$msg      <- ifelse(length(act)==3,'speciale actie','verplaatsing')
-      out$player   <- act[1]                                     # log all elements
-      out$unit     <- gsub('\\d','', act[2])
-      out$quantity <- gsub('\\D','', act[2])
-      out$y1       <- gsub('\\d','', act[3])
-      out$x1       <- gsub('\\D','', act[3])
-      out$y2       <- gsub('\\d','', act[4])
-      out$x2       <- gsub('\\D','', act[4])
-    }
-  } else {
-    out$type <- 'fout'
-    out$msg  <- 'onbekend formaat'
-  }
-  return(out)
-}
-
-## B ENGINE 2.0
-battle_engine <- function(tbs, x, y){
-  
-  fight <- tbs[tbs$xPos == x & tbs$yPos == y,]                                            # select all units on square
-  done  <- F
-  turn  <- 1
-  fighters <- NULL
-  msg   <- paste0("Uitslag gevecht ",y,x)
-
-  for(i in 1:nrow(fight)){                                                                # loop over all units in the fight
-    pcurrent <- fight$player[i]                                                           # find current player
-    ocurrent <- fight$unit[fight$player != pcurrent]                                      # find possible opponents
-    ucurrent <- unitDef[unitDef$Unit==fight$unit[i],unitDef$Unit] * fight$quantity[i] # find relative strength against all possible opponents
-    ucurrent[!names(ucurrent) %in% ocurrent] <- 0                                         # set strengths against non-existing opponents to 0
-    fighters <- rbind(fighters, cbind(fight[i,c('player','unit','quantity')],ucurrent))   # add this information to current fighter sheet
-  }
-
-  while(done==F){                                                                         # initiate a round of fighting the fight
-    loc = which(fighters[,-(1:3)]==max(fighters[,-(1:3)]),arr.ind = T)                    # find location of highest attack power
-    loc = loc[sample(nrow(loc),1),]                                                       # in case of multiple equals, choose randomly
-    pattack = fighters$player[loc[1]]                                                     # find attacking player
-    udefend = which(fighters$player != pattack & fighters$unit==names(fighters)[3+loc[2]])# find defending unit
-    udefend = ifelse(length(udefend==1),udefend,sample(udefend,1))                        # in case of multiple defending units, choose randmoly
-
-    # now, actually perform the attack
-    q <- fighters$quantity[udefend]        # get quantity of defending units
-    msg <- paste(msg,paste(fighters$quantity[loc[1]],fighters$unit[loc[1]],'van',pattack,'vs',q,names(fighters[3+loc[2]]),'van',fighters$player[udefend]), sep = '<br/>')
-
-    # attacker vs defender
-    fighters$quantity[udefend] <- fighters$quantity[udefend] - fighters[loc[1],3+loc[2]] # select
-
-    # defender vs attacker
-    fighters$quantity[loc[1]] <- fighters$quantity[loc[1]] - floor(q * fighters[udefend,names(fighters) %in% fighters$unit[loc[1]]])
-
-    # clean up quantities a bit
-    fighters$quantity[fighters$quantity<0] <- 0
-
-    # reduce attacking power of attacker
-    fighters[loc[1],names(fighters) %in% fight$unit] = floor(fighters[loc[1],names(fighters) %in% fight$unit] * (fighters[loc[1],3+loc[2]]-q)/fighters[loc[1],3+loc[2]])
-    fighters[loc[1],loc[2]+3] <- 0 # set remaining attack power against defending unit to 0 (to avoid infinite attacks)
-
-    tbs$quantity[tbs$xPos == x & tbs$yPos == y] <- fighters$quantity # update boardState
-
-    turn = turn+1
-    if(length(unique(fighters$player[fighters$quantity>0]))==1){                     # if only 1 player left with units, break
-      done=T
-    } else if(all(fighters[,-c(1:3)]==0)){                                           # if none of the remaining units has any attacking power vs other units, break
-      done=T
-    } else if(turn>50){
-      done=T                                                                         # force a break if there is no winner after 50 turns
-    }
-  }
-  tbs <- tbs[tbs$quantity>0,]
-
-  return(list(boardState=tbs,msg=msg))
-}
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # X. ARCHIVE
