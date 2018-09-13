@@ -57,24 +57,25 @@ server <- function(input, output, session) {
     act <- parse_action(input$p1a1)
     
     if(act$type=="succes"){
-      chk <- check_action(d$bs,act$player,act$unit,act$quantity,act$x1,act$y1,act$x2,act$y2)
+      chk <- check_action(d$bs,act$player,act$unit,act$quantity,act$x1,act$y1,act$path)
       act$type  <- chk$type
       act$msg   <- chk$msg
     }
 
     if(act$type=="succes"){                                                                    # IF the action is valid (i.e. success)
-      if(is.na(act$x2) & is.na(act$y2)){
-        d$bs <- create_unit(d$bs,act$player,act$unit,act$quantity,act$x1,act$y1)
+      if(is.na(act$path)){
+        d$bs    <- buy_unit(d$bs,act$player,act$unit,act$quantity,act$x1,act$y1)
         act$msg <- 'unit gekocht'
       } else {
-        move <- execute_move(d$bs,act$player,act$unit,act$quantity,act$x1,act$y1,act$x2,act$y2)     # THEN actually perform the move
+        move    <- execute_move(d$bs,act$player,act$unit,act$quantity,act$x1,act$y1,act$path)     # THEN actually perform the move
         act$msg <- move$msg
-        d$bs <- move$bs
+        d$bs    <- move$tbs
       }
     }
     
     output$endOfTurnResult <- renderText(paste(act$msg))
     updateActionButton(session,"p1a1submit",label=act$type)
+    update_score_buttons(session)
   })
   
   #-------------------------------------------#
@@ -85,22 +86,31 @@ server <- function(input, output, session) {
     
     #-------------------------------------------#
     # 2.c.1. CHECK/EXECUTE BATTLES
-    
     for(x in unique(d$bs$xPos)){                                                              # loop over all x coördinates
       for(y in unique(d$bs$yPos)){                                                            # loop over all y coördinates
         if(any(d$bs$xPos==x & d$bs$yPos==y) ){                                                # check if ANY units occupy the current square
           if(length(unique(d$bs$player[d$bs$xPos==x & d$bs$yPos==y]))>1){                     # check if >1 PLAYER occupies the current square
             battleOutcome <- battle_engine(d$bs,x,y)                                          # if so, trigger battle engine
             msg2 <- battleOutcome$msg
-            d$bs <- battleOutcome$boardState
-            msg <- paste(msg,'battle at: ',x,y,' winner: ',unique(d$bs$player[d$bs$xPos==x & d$bs$yPos==y]),sep='') # log the outcome
+            d$bs <- battleOutcome$tbs
+            msg  <- paste(msg,'battle at: ',x,y,' winner: ',unique(d$bs$player[d$bs$xPos==x & d$bs$yPos==y]),sep='') # log the outcome
             output$battleResult <- renderUI({HTML(msg2)})
           }
         }
       }
     }
-    update_score_buttons(session)                                                             # this will simply overwrite the current value
+    
+    #-------------------------------------------#
+    # 2.c.2. HOUSEKEEPING
+    d$bs           <- simplify_board(d$bs)                                                    # check board if necessary
     output$endOfTurnResult <- renderText({msg})                                               # report back on the outcome of the turn
+    turn           <<- turn + 1                                                               # increase turn counter
+    year           <<- yearStart + floor(turn/yearCycle)                                      # increase year if necessary 
+    playerDef$Gold <<- playerDef$Gold + turnBonus                                             # add turn bonus
+    playerDef$Gold <<- playerDef$Gold + ifelse(floor(turn/yearCycle)-floor((turn-1)/yearCycle)==1,yearBonus,0) # in case of new year, add year bonus
+    
+    update_score_buttons(session)                                                             # this will simply overwrite the current value
+    #write.csv(d$bs, paste0("year_",year,"_turn_",turn,".csv"))                               # write end-of-turn state to file
   })
   
   #-------------------------------------------#
@@ -128,13 +138,12 @@ server <- function(input, output, session) {
     rasterImage(spr[['board']],0,0,gridRes[1],gridRes[2])                                     # create 'base layer' of game map to start drawing on
 
     for(i in 1:nrow(d$bs)){                                                                   # loop over all units in boardState
-      if(!is.na(d$bs$sprite[i])){                                                             # only draw units with a defined sprite  
-        rasterImage(spr[[d$bs$sprite[i]]],                                                    # cast sprite pointer (char) to variable, and draw
-                    d$bs[i,'xRes'],                                                           # define correct x1,y1,x2,y2 coördinates (in pixels)
-                    d$bs[i,'yRes'],
-                    d$bs[i,'xRes']+sprRes[1],
-                    d$bs[i,'yRes']+sprRes[2])
-      }
+      rasterImage(spr[[d$bs$sprite[i]]],                                                    # cast sprite pointer (char) to variable, and draw
+                  d$bs[i,'xRes'],                                                           # define correct x1,y1,x2,y2 coördinates (in pixels)
+                  d$bs[i,'yRes'],
+                  d$bs[i,'xRes']+sprRes[1],
+                  d$bs[i,'yRes']+sprRes[2])
+      text(x=d$bs$xRes[i]+sprRes[1]*0.8,y=d$bs$yRes[i]+sprRes[2]*0.8,d$bs$quantity[i],cex=1.3, font=2)
     }
     
     abline(h=seq(0,gridRes[2],sprRes[2]), col="darkgrey", lwd=4)                              # horizontal lines. Draw these LAST to mask potential sprite-overlaps

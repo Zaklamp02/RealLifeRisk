@@ -55,8 +55,12 @@ ui <- dashboardPage(
                 ),
                 
                 #---------------------------#
-                # 3.a.2 SCORE OVERVIEW
+                # 3.a.2 GAME OVERVIEW
                 column(3,                                                                          # note that we are still in the same row, but we are defining a new column (of width=3, which together with the previous one makes exactly 12)
+                       fluidRow(
+                         actionButton("turn",paste('turn',turn)),
+                         actionButton("year",paste('year',year))
+                       ),
                        fluidRow(
                          lapply(1:nrow(playerDef), function(i) {                                   # this will create a 'score button' for each player
                            column(12/nrow(playerDef), style='padding:0px;',                        # create column of 1/nplayers
@@ -159,17 +163,60 @@ ui <- dashboardPage(
       #-----------------------------------------#
       # 3.c CREATE SETTINGS TAB
       #-----------------------------------------#
-      tabItem(tabName="Settings",
-              
-              fluidRow(
-                column(2, textOutput("set_txt1"))
-              ),
-              fluidRow(
-                DT::dataTableOutput("tbl_boardState")
-              ),
-              fluidRow(
-                tags$audio(src = "Nijmegen.mp3", type = "audio/mp3", autoplay = 1, controls = NA)
-              )
+      tabItem(
+        tabName="Settings",
+        
+        column(4,
+               fluidRow(
+                 box(title="Game Settings", status = "primary", width="100%",
+                     textInput("turn_bonus","Bonus per turn",turnBonus),
+                     textInput("year_bonus","Bonus per year",yearBonus),
+                     textInput("year_cycle","Turns per year",yearCycle),
+                     textInput("start_year","Start year",year),
+                     textInput("start_turn","Start turn",turn)
+                 ),
+                 box(title="Settings", status = "primary", width="100%",
+                     column(6,textInput("scrn_res_x","Screen Resolution (x)",scrnRes[1])),
+                     column(6,textInput("scrn_res_y","Screen Resolution (y)",scrnRes[2])),
+                     column(6,textInput("grd_size_x","Board Size (x)",gridRes[1])),
+                     column(6,textInput("grd_size,y","Board Size (y)",gridRes[2])),
+                     column(6,textInput("spr_size_x","Sprite Size (x)",sprRes[1])),
+                     column(6,textInput("spr_size,y","Sprite Size (y)",sprRes[2]))
+                 )
+               )
+        ),
+        column(8,
+               column(12,
+                      fluidRow(
+                        DT::dataTableOutput("tbl_boardState")
+                      )
+               ),
+               column(12,
+                 
+                 column(6,
+                        fluidRow(
+                          box(title="Save/Load", status = "primary", width="100%",
+                              fluidRow(style='padding:10px;',
+                                actionButton("save","Save Game",icon('save')),
+                                actionButton("save","Save CSV",icon('table')),
+                                actionButton("saveImg","Save JPG", icon('image')),
+                                actionButton("saveGif","Save Gif",icon('film'))
+                              ),
+                              fluidRow(style='padding:10px;',
+                                fileInput("file1", NULL, multiple = FALSE, accept = c("text/csv","text/comma-separated-values,text/plain",".csv"))
+                              )
+                          )
+                        )
+                 ),
+                 column(6,
+                        fluidRow(
+                          box(title="Audio", status = "primary", width="100%",
+                              tags$audio(src = "Nijmegen.mp3", type = "audio/mp3", autoplay = 1, controls = NA)
+                          )
+                        )
+                 )
+               )
+        )
       )
     )
   )
@@ -186,3 +233,10 @@ ui <- dashboardPage(
 #    \||/\/\//\|/     
 #
 # 
+#    tags$head(
+#      tags$style(HTML(".ra2_background_style{
+#                      background-repeat: no-repeat; background-size: cover;
+#                      background-image: url('menu_background.png'); 
+#                      }"))),
+#    class="ra2_background_style",
+

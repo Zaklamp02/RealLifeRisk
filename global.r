@@ -22,6 +22,7 @@
 
 # Load basic packages
 library(shiny)
+library(shinyWidgets)
 library(shinydashboard)
 library(png)
 library(DT)
@@ -40,7 +41,15 @@ yNames   = c(LETTERS, sapply(LETTERS, function(x) paste0(x, LETTERS)))[1:gridSiz
 xNames   = as.character(1:gridSize[1])                                                     # names of X axis
 uNames   = unitDef$Unit                                                                    # unit names (abbreviated)
 pNames   = playerDef$Player                                                                # names of players (abbreviated)
-startIni = 15                                                                              # RANDOMLY initialize the board with 15 units
+
+# Basic variables
+startIni = 25                                                                              # RANDOMLY initialize the board with 15 units
+turn     = 1                                                                               # can be anything
+year     = 1945                                                                            # define the current year
+yearStart= 1945                                                                            # define when the game begins
+yearCycle= 5                                                                               # defines how many turns constitute a year
+turnBonus = 500
+yearBonus = 1500
 
 # Basic board definition
 boardDef = data.frame(xPos     = rep(xNames,each=gridSize[2]),                             # all possible X coördinates (in grid)
@@ -51,22 +60,22 @@ boardDef = data.frame(xPos     = rep(xNames,each=gridSize[2]),                  
                       stringsAsFactors=F)                                                  # make sure to encode as 'char' instead of 'factor'
 
 # Create initial board state
-boardState <- data.frame(xPos=sample(1:length(xNames),8),
-                         yPos=sample(1:length(yNames),8))
+boardState <- data.frame(xPos=sample(1:length(xNames),startIni,replace=T),
+                         yPos=sample(1:length(yNames),startIni,replace=T))
 boardState$xRes <- boardState$xPos * sprRes[1]-sprRes[1]
 boardState$yRes <- boardState$yPos * sprRes[2]-sprRes[2]
 boardState$xPos <- xNames[boardState$xPos]
 boardState$yPos <- yNames[boardState$yPos]
-boardState$player <- sample(pNames,8,replace=T)
-boardState$unit   <- sample(uNames,8,replace=T)
+boardState$player <- sample(pNames,startIni,replace=T)
+boardState$unit   <- sample(uNames,startIni,replace=T)
 boardState$sprite <- paste0(boardState$unit,boardState$player)
-boardState$quantity <- sample(1:4,8,replace=T)
+boardState$quantity <- sample(1:4,startIni,replace=T)
 
 # Load images & sprites
 spr <- list()                                                                              # this will hold all sprites
 spr[['board']] = readPNG(file.path(getwd(),'www','base_map.png'),native=T)                 # read gameboard
 for(i in 1:nrow(unitDef)){                                                                 # loop over units
-  sprTmp <- image_read(file.path(getwd(),'www',paste0('spr_',unitDef$Label[i],'.png')))    # read sprite for current unit
+  sprTmp <- image_read(file.path(getwd(),'www',paste0('spr_',unitDef$Label[i],'.jpeg')))    # read sprite for current unit
   for(j in 1:nrow(playerDef)){                                                             # loop over players
     spr[[paste0(unitDef$Unit[i],playerDef$Player[j])]] <- sprTmp %>%                       # make copy of unit sprite
       image_fill(color=playerDef$Color[j],fuzz=20) %>%                                     # set background of sprite to player color
@@ -85,39 +94,52 @@ for(i in 1:nrow(unitDef)){                                                      
 #
 #-------------------------------------------#
 
-check_action <- function(boardState,player,unit,quantity,x1,y1,x2,y2){
-  
-  # Assume action is correctly specified
-  out <- list()
+check_action <- function(tbs,player,unit,quantity,x1,y1,path){
+  out      <- list()                                                                                     # allocate variable to hold output
+  out$type <- 'fout'                                                                                     # assume the worst
 
-  # Basic checks
-  if(! player %in% pNames){
-    out$type <- 'fout'
-    out$msg  <- 'speler bestaat niet'
-  } else if(! unit %in% uNames){
-    out$type <- 'fout'
-    out$msg  <- 'unit bestaat niet'
-  } else if(! x1 %in% boardDef$xPos){
-    out$type <- 'fout'
-    out$msg  <- 'start bestaat niet'
-  } else if(! x2 %in% boardDef$xPos & y2 %in% boardDef$yPos){
-    out$type <- 'fout'
-    out$msg  <- 'doel bestaat niet'
-  } else {
-    out$type <- 'succes'
-    out$msg  <- 'actie begrepen'
-  }
+  # Perform GENERAL checks
+  if(! player %in% pNames){                                                                              # check if player name exists
+    out$msg  <- 'speler bestaat niet'                                                                    # if so, update message
+  } else if(! unit %in% uNames){                                                                         # check if unit type exists, use else-if to create chain of checks
+    out$msg  <- 'unit bestaat niet'                                                                      # if so, update message
+  } else if(!x1 %in% boardDef$xPos | !y1 %in% boardDef$yPos){                                            # etc. etc. etc.
+    out$msg  <- 'startcoördinaat bestaat niet'
   
-  # Advanced checks
-#  if(!player %in% boardState[boardState$xPos==x1 & boardState$yPos==y1,'player']){
-#    message = 'Player does not exist on start coördinate'
-#  } else if(!unit %in% boardState[boardState$xPos==x1 & boardState$yPos==y1 & boardState$player==player,'unit']){
-#    message = 'Unit does not exist on start coördinate'
-#  } else if(quantity < boardState[boardState$xPos==x1 & boardState$yPos==y1 & boardState$player==player,'quantity']){
-#    message = 'Not enough units on start coördinate'
-#  } else if(boardDef[boardDef$xPos==x2 & boardDef$yPos==y2,'water']=='yes'){
-#    message = 'Destination coördinate is water!'
-#  }
+  # Check SPECIAL actions
+  } else if(is.na(path)){
+    if(unitDef$Cost[unitDef$Unit==unit]*as.numeric(quantity) > playerDef$Gold[playerDef$Player==player] ){
+      out$msg  <- 'Onvoldoende geld'
+    } else {
+      out$type <- 'succes'
+      out$msg  <- paste0("Koop ",quantity,unit,' op ',x1,y1)
+    }
+    
+  # Check MOVE actions
+  } else if(!is.na(path)) {
+    pathSep <- unlist(strsplit(path,NULL))                                                               # separate path into individual components
+    destE2  <- sum(pathSep %in% c("R","W")) - sum(pathSep %in% c("L","E"))                               # calculate horizontal movement (in squares)
+    destN2  <- sum(pathSep %in% c("U","N")) - sum(pathSep %in% c("D","S"))                               # calculate vertical movement (in squares)
+    x2      <- ifelse(which(x1==xNames)+destE<=0,NA,xNames[which(x1==xNames)+destE])                     # find target x coördinate
+    y2      <- ifelse(which(y1==yNames)+destN<=0,NA,yNames[which(y1==yNames)+destN])                     # find target y coördinate
+    
+    if(nrow(tbs[tbs$xPos==x1 & tbs$yPos==y1,])<=0){                                                      # check if ANY units exist on square
+      out$msg  <- 'Je hebt hier geen units'                                            
+    } else if(!tbs$player[tbs$xPos==x1 & tbs$yPos==y1] %in% player){                                     # check if PLAYER has units on square
+      out$msg  <- 'Je hebt hier geen units'
+    } else if(!tbs$unit[tbs$xPos==x1 & tbs$yPos==y1 & tbs$player==player] %in% unit){                    # check if player has TARGET UNIT on square
+      out$msg  <- 'Unit niet op startcoördinaat'
+    } else if(tbs$quantity[tbs$xPos==x1 & tbs$yPos==y1 & tbs$player==player & tbs$unit==unit] < quantity){ # check if player has sufficient QUANTITY of units
+      out$msg  <- 'Onvoldoende units op startcoördinaat'
+    } else if(nchar(path) > unitDef$Speed[unitDef$Unit==unit]){                                          # check if unit can move far enough
+      out$msg  <- 'Verplaatsing te ver'
+    } else if(is.na(x2) | is.na(y2)){                                                                    # check if target coördinate is valid
+      out$msg  <- 'Doelcoördinaat buiten kaart'
+    } else {
+      out$type <- 'succes'
+      out$msg  <- paste0("Verplaats ",quantity,unit,' naar ',y2,x2)
+    }
+  }
 
   return(out)
 }
@@ -135,7 +157,7 @@ check_action <- function(boardState,player,unit,quantity,x1,y1,x2,y2){
 #
 #-------------------------------------------#
 
-execute_move <- function(tbs,player,unit,quantity,x1,y1,x2,path){
+execute_move <- function(tbs,player,unit,quantity,x1,y1,path){
   msg <- 'unit succesvol verplaatst naar: '
   
   if(unit == 'ALL'){
@@ -194,7 +216,7 @@ execute_move <- function(tbs,player,unit,quantity,x1,y1,x2,path){
   
   msg <- paste(msg,tbs$xPos[rowFrom],tbs$yPos[rowFrom])                        # add destination coördinates to output message
 
-  return(list(bs=tbs,msg=msg))
+  return(list(tbs=tbs,msg=msg))
 }
 
 
@@ -208,22 +230,27 @@ execute_move <- function(tbs,player,unit,quantity,x1,y1,x2,path){
 #
 #-------------------------------------------#
 
-create_unit <- function(boardState,player,unit,quantity,x,y){
-  boardState <- rbind(boardState,boardState[1,])                                             # randomly duplicate first row as a placeholder
-  boardState[nrow(boardState),'xPos']      <- x                                              # now set all variables to correct values
-  boardState[nrow(boardState),'yPos']      <- y
-  boardState[nrow(boardState),'xRes']      <- as.numeric(x)*sprRes[1]-sprRes[1]
-  boardState[nrow(boardState),'yRes']      <- which(LETTERS %in% y) * sprRes[2]-sprRes[2]
-  boardState[nrow(boardState),'unit']      <- unit
-  boardState[nrow(boardState),'player']    <- player
-  boardState[nrow(boardState),'sprite']    <- paste0(unit,player)
-  boardState[nrow(boardState),'quantity']  <- as.numeric(quantity)
+create_unit <- function(tbs,player,unit,quantity,x,y){
+  tbs <- rbind(tbs,tbs[1,])                                             # randomly duplicate first row as a placeholder
+  tbs[nrow(tbs),'xPos']      <- x                                              # now set all variables to correct values
+  tbs[nrow(tbs),'yPos']      <- y
+  tbs[nrow(tbs),'xRes']      <- as.numeric(x)*sprRes[1]-sprRes[1]
+  tbs[nrow(tbs),'yRes']      <- which(LETTERS %in% y) * sprRes[2]-sprRes[2]
+  tbs[nrow(tbs),'unit']      <- unit
+  tbs[nrow(tbs),'player']    <- player
+  tbs[nrow(tbs),'sprite']    <- paste0(unit,player)
+  tbs[nrow(tbs),'quantity']  <- as.numeric(quantity)
+
+  tbs <- simplify_board(tbs)
   
-#  spr <- unitDef[unitDef$unit==unit,'sprite']                                                # look up correct sprite pointer in unitDef
-#  spr <- sub('p1',tolower(player),spr)                                                       # substitute correct player identifier in sprite pointer
-#  boardState[nrow(boardState),'sprite']    <- spr                                            # actually log sprite pointer in dataframe
+  return(tbs)
+}
+
+buy_unit <- function(tbs,player,unit,quantity,x,y){
+  tbs <- create_unit(tbs,player,unit,quantity,x,y)
+  playerDef$Gold[playerDef$Player==player] <<- playerDef$Gold[playerDef$Player==player] - unitDef$Cost[unitDef$Unit==unit]*as.numeric(quantity) 
   
-  return(boardState)
+  return(tbs)
 }
 
 #-------------------------------------------#
@@ -242,9 +269,9 @@ create_unit <- function(boardState,player,unit,quantity,x,y){
 #
 #-------------------------------------------#
 
-battle_engine <- function(bs, x, y){
+battle_engine <- function(tbs, x, y){
   
-  fight <- bs[bs$xPos == x & bs$yPos == y,]                                                # select all units on square
+  fight <- tbs[tbs$xPos == x & tbs$yPos == y,]                                                # select all units on square
   done  <- F                                                                               # used later on to define the end of the battle
   turn  <- 0                                                                               # used later to check how many turns were taken
   fighters <- NULL                                                                         # convenience variable
@@ -307,9 +334,10 @@ battle_engine <- function(bs, x, y){
     }
   }
   
-  bs <- rbind(bs[bs$xPos != x | bs$yPos != y,],bs[rownames(fighters),])
+  tbs <- rbind(tbs[tbs$xPos != x | tbs$yPos != y,],tbs[rownames(fighters),])            # remove vanquished units from board
+  tbs <- simplify_board(tbs)                                                            # make sure to remove potential duplicates (probably unnecessary here)
 
-  return(list(boardState=bs,msg=msg))
+  return(list(tbs=tbs,msg=msg))
 }
 
 #-------------------------------------------#
@@ -340,14 +368,13 @@ parse_action <- function(action){
       out$msg  <- 'teveel elementen'
     } else{                                                    # then either 3 or 4 elements
       out$type     <- 'succes'                                 # log that parsing was successful
-      out$msg      <- ifelse(length(act)==3,'speciale actie','verplaatsing')
-      out$player   <- act[1]                                   # log all elements
-      out$unit     <- gsub('\\d','', act[2])
-      out$quantity <- gsub('\\D','', act[2])
-      out$y1       <- gsub('\\d','', act[3])
-      out$x1       <- gsub('\\D','', act[3])
-      out$y2       <- gsub('\\d','', act[4])
-      out$x2       <- gsub('\\D','', act[4])
+      out$msg      <- paste('actie bevat', length(act),'elementen')
+      out$player   <- toupper(act[1])                          # log all elements
+      out$unit     <- toupper(gsub('\\d','', act[2]))
+      out$quantity <- as.numeric(gsub('\\D','', act[2]))
+      out$y1       <- toupper(gsub('\\d','', act[3]))
+      out$x1       <- toupper(gsub('\\D','', act[3]))
+      out$path     <- toupper(gsub('\\d','', act[4]))
     }
   } else {
     out$type <- 'fout'
@@ -366,10 +393,35 @@ parse_action <- function(action){
 #
 #-------------------------------------------#
 
-update_score_buttons <- function(session){                              # function will only work for 1 session at a time
-  for(i in 1:nrow(playerDef)){                                          # for every player ...
+update_score_buttons <- function(session){                                     # function will only work for 1 session at a time
+  for(i in 1:nrow(playerDef)){                                                 # for every player ...
     updateActionButton(session,paste0("p",i,"Score"),label=paste(playerDef$Label[i],playerDef$Gold[i])) # ... update the gold-button
   }
+  updateActionButton(session,"turn",paste("turn",turn))
+  updateActionButton(session,"year",paste("year",year))
+}
+
+#-------------------------------------------#
+# 7. SIMPLIFY BOARD
+#-------------------------------------------#
+#
+# Minor function to remove duplicate rows
+# The function will merge identical rows 
+# (i.e. same unit, player ánd coördinate)
+# and collapse them, summing the quantity
+#
+#-------------------------------------------#
+
+simplify_board <- function(tbs){
+  tbs$xRes <- match(tbs$xPos,xNames) * sprRes[1]-sprRes[1]                     # double-check x pixel coördinates
+  tbs$yRes <- match(tbs$yPos,yNames) * sprRes[2]-sprRes[2]                     # check y pixel coördinates
+  
+  # remove duplicates
+  tbs <- setNames(aggregate(tbs[, c("quantity")],                              # remove any duplicate rows, and return boardstate
+                            tbs[, names(tbs)[!names(tbs) %in% c("quantity")]], # this will take all rows that are identical
+                            FUN = sum, na.rm = TRUE),                          # ... and collapse them while summing the quantity
+                  c(names(tbs)[!names(tbs) %in% c("quantity")],"quantity"))    # finally, make sure column names are correct
+  return(tbs)
 }
 
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!#
@@ -382,17 +434,17 @@ update_score_buttons <- function(session){                              # functi
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!#
 
 # EVALUATE ACTION
-evaluate_action <- function(boardState,action){
+evaluate_action <- function(tbs,action){
   
-  a <- parse_action(boardState, action)
+  a <- parse_action(tbs, action)
   
-  aType <- check_action(boardState,a[[1]],a[[2]],a[[3]],a[[4]],a[[5]],a[[6]],a[[7]])
+  aType <- check_action(tbs,a[[1]],a[[2]],a[[3]],a[[4]],a[[5]],a[[6]],a[[7]])
   
   # Possible action types: unit_move, unit_create, special
   if(aType == 'unit_move'){
-    do_move(boardState,a[[1]],a[[2]],a[[3]],a[[4]],a[[5]],a[[6]],a[[7]])
+    do_move(tbs,a[[1]],a[[2]],a[[3]],a[[4]],a[[5]],a[[6]],a[[7]])
   } else if( aType == 'unit_create'){
-    create_unit(boardState,a[[1]],a[[2]],a[[3]],a[[5]],a[[4]])
+    create_unit(tbs,a[[1]],a[[2]],a[[3]],a[[5]],a[[4]])
   }
   
 }
