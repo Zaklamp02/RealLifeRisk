@@ -58,8 +58,10 @@ ui <- dashboardPage(
                 # 3.a.2 GAME OVERVIEW
                 column(3,                                                                          # note that we are still in the same row, but we are defining a new column (of width=3, which together with the previous one makes exactly 12)
                        fluidRow(
+                         actionButton("backward","<<"),
                          actionButton("turn",paste('turn',turn)),
-                         actionButton("year",paste('year',year))
+                         actionButton("year",paste('year',year)),
+                         actionButton("forward",">>")
                        ),
                        fluidRow(
                          lapply(1:nrow(playerDef), function(i) {                                   # this will create a 'score button' for each player
@@ -102,7 +104,7 @@ ui <- dashboardPage(
               fluidRow(
                 lapply(1:nrow(playerDef), function(i) {
                   column(12/nrow(playerDef),
-                         box(title = paste("Player",i), status = "primary", width="100%",
+                         box(title = playerDef$Label[i], status = "primary", width="100%",
                              fluidRow(
                                column(8,textInput(paste0("p",i,"a1"),NULL,paste0("P",i,"."))),
                                actionButton(paste0("p",i,"a1submit"),"",icon=icon("cog"))
@@ -199,7 +201,7 @@ ui <- dashboardPage(
                               fluidRow(style='padding:10px;',
                                 actionButton("save","Save Game",icon('save')),
                                 actionButton("save","Save CSV",icon('table')),
-                                actionButton("saveImg","Save JPG", icon('image')),
+                                downloadButton("saveImg","Save PNG", icon('image')),
                                 actionButton("saveGif","Save Gif",icon('film'))
                               ),
                               fluidRow(style='padding:10px;',
