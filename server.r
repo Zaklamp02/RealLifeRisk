@@ -30,25 +30,25 @@ server <- function(input, output, session) {
   observeEvent(input$btn_up,{                                                                 # in this case, listen to 'button up' event
     d$bs[sel$row,'yRes'] = d$bs[sel$row,'yRes'] + sprRes[2]                                   # if 'button up' is pressed, move the unit up by 1x the sprite resolution
     d$bs[sel$row,'yPos'] = LETTERS[which(LETTERS %in% d$bs[sel$row,'yPos'])+1]                # also update the Y coördinate
-    d$land <- updateMapOwner(d$land,d$bs$xRes[sel$row],d$bs$yRes[sel$row],d$bs$player[sel$row])
+    d$land <- updateMapOwner(d$land,d$bs$xPos[sel$row],d$bs$yPos[sel$row],d$bs$player[sel$row])
   })
   
   observeEvent(input$btn_down,{                                                               # create similar interactions for the other buttons
     d$bs[sel$row,'yRes'] = d$bs[sel$row,'yRes'] - sprRes[2]
     d$bs[sel$row,'yPos'] = LETTERS[which(LETTERS %in% d$bs[sel$row,'yPos'])-1]
-    d$land <- updateMapOwner(d$land,d$bs$xRes[sel$row],d$bs$yRes[sel$row],d$bs$player[sel$row])
+    d$land <- updateMapOwner(d$land,d$bs$xPos[sel$row],d$bs$yPos[sel$row],d$bs$player[sel$row])
   })
   
   observeEvent(input$btn_left,{
     d$bs[sel$row,'xRes'] = d$bs[sel$row,'xRes'] - sprRes[1]
     d$bs[sel$row,'xPos'] = as.character(as.numeric(d$bs[sel$row,'xPos'])-1)
-    d$land <- updateMapOwner(d$land,d$bs$xRes[sel$row],d$bs$yRes[sel$row],d$bs$player[sel$row])
+    d$land <- updateMapOwner(d$land,d$bs$xPos[sel$row],d$bs$yPos[sel$row],d$bs$player[sel$row])
   })
   
   observeEvent(input$btn_right,{
     d$bs[sel$row,'xRes'] = d$bs[sel$row,'xRes'] + sprRes[1]
     d$bs[sel$row,'xPos'] = as.character(as.numeric(d$bs[sel$row,'xPos'])+1)
-    d$land <- updateMapOwner(d$land,d$bs$xRes[sel$row],d$bs$yRes[sel$row],d$bs$player[sel$row])
+    d$land <- updateMapOwner(d$land,d$bs$xPos[sel$row],d$bs$yPos[sel$row],d$bs$player[sel$row])
   })
   
   #-------------------------------------------#
@@ -77,69 +77,88 @@ server <- function(input, output, session) {
   #-------------------------------------------#
   # 2.c. OBSERVE: ACTION SUBMISSION
   #-------------------------------------------#
+  observe({updateActionButton(session,"p1a1submit",label=paste(lazy_check(d$bs,input$p1a1)[2]))})
+  observe({updateActionButton(session,"p1a2submit",label=paste(lazy_check(d$bs,input$p1a2)[2]))})
+  observe({updateActionButton(session,"p1a3submit",label=paste(lazy_check(d$bs,input$p1a3)[2]))})
+  observe({updateActionButton(session,"p2a1submit",label=paste(lazy_check(d$bs,input$p2a1)[2]))})
+  observe({updateActionButton(session,"p2a2submit",label=paste(lazy_check(d$bs,input$p2a2)[2]))})
+  observe({updateActionButton(session,"p2a3submit",label=paste(lazy_check(d$bs,input$p2a3)[2]))})
+  observe({updateActionButton(session,"p3a1submit",label=paste(lazy_check(d$bs,input$p3a1)[2]))})
+  observe({updateActionButton(session,"p3a2submit",label=paste(lazy_check(d$bs,input$p3a2)[2]))})
+  observe({updateActionButton(session,"p3a3submit",label=paste(lazy_check(d$bs,input$p3a3)[2]))})
+  
   observeEvent(input$p1a1submit,{
-    act <- parse_action(input$p1a1)
-    
-    if(act$type=="succes"){
-      chk <- check_action(d$bs,act$player,act$unit,act$quantity,act$x1,act$y1,act$path)
-      act$type  <- chk$type
-      act$msg   <- chk$msg
-    }
-
-    if(act$type=="succes"){                                                                    # IF the action is valid (i.e. success)
-      if(is.na(act$path)){
-        d$bs    <- buy_unit(d$bs,act$player,act$unit,act$quantity,act$x1,act$y1)
-        act$msg <- 'unit gekocht'
-        d$land  <- updateMapOwner(d$land,act$x1,act$y1,act$player)
-      } else {
-        move    <- execute_move(d$bs,d$land,act$player,act$unit,act$quantity,act$x1,act$y1,act$path) # THEN actually perform the move
-        act$msg <- move$msg
-        d$bs    <- move$tbs
-        d$land  <- move$tland
-      }
-    }
-    
-    output$endOfTurnResult <- renderText(paste(act$msg))
-    updateActionButton(session,"p1a1submit",label=act$type)
-    update_buttons(session)
+    result     <- do_action(session,d$bs,d$land,input$p1a1)
+    d$bs       <- result$tbs
+    d$land     <- result$tland
+    updateActionButton(session,"p1a1submit",label=paste(result$msg$type,result$msg$check,sep=' , '))
+    shinyjs::toggleState("p1a1")
+  })
+  observeEvent(input$p1a2submit,{
+    result     <- do_action(session,d$bs,d$land,input$p1a2)
+    d$bs       <- result$tbs
+    d$land     <- result$tland
+    updateActionButton(session,"p1a2submit",label=paste(result$msg$type,result$msg$check,sep=' , '))
+    shinyjs::toggleState("p1a2")
+  })
+  observeEvent(input$p1a3submit,{
+    result     <- do_action(session,d$bs,d$land,input$p1a3)
+    d$bs       <- result$tbs
+    d$land     <- result$tland
+    updateActionButton(session,"p1a3submit",label=paste(result$msg$type,result$msg$check,sep=' , '))
+    shinyjs::toggleState("p1a3")
+  })
+  observeEvent(input$p2a1submit,{
+    result     <- do_action(session,d$bs,d$land,input$p2a1)
+    d$bs       <- result$tbs
+    d$land     <- result$tland
+    updateActionButton(session,"p2a1submit",label=paste(result$msg$type,result$msg$check,sep=' , '))
+    shinyjs::toggleState("p2a1")
+  })
+  observeEvent(input$p2a2submit,{
+    result     <- do_action(session,d$bs,d$land,input$p2a2)
+    d$bs       <- result$tbs
+    d$land     <- result$tland
+    updateActionButton(session,"p2a2submit",label=paste(result$msg$type,result$msg$check,sep=' , '))
+    shinyjs::toggleState("p2a2")
+  })
+  observeEvent(input$p2a3submit,{
+    result     <- do_action(session,d$bs,d$land,input$p2a3)
+    d$bs       <- result$tbs
+    d$land     <- result$tland
+    updateActionButton(session,"p2a3submit",label=paste(result$msg$type,result$msg$check,sep=' , '))
+    shinyjs::toggleState("p2a3")
+  })
+  observeEvent(input$p3a1submit,{
+    result     <- do_action(session,d$bs,d$land,input$p3a1)
+    d$bs       <- result$tbs
+    d$land     <- result$tland
+    updateActionButton(session,"p3a1submit",label=paste(result$msg$type,result$msg$check,sep=' , '))
+    shinyjs::toggleState("p3a1")
+  })
+  observeEvent(input$p3a2submit,{
+    result     <- do_action(session,d$bs,d$land,input$p3a2)
+    d$bs       <- result$tbs
+    d$land     <- result$tland
+    updateActionButton(session,"p3a2submit",label=paste(result$msg$type,result$msg$check,sep=' , '))
+    shinyjs::toggleState("p3a2")
+  })
+  observeEvent(input$p3a3submit,{
+    result     <- do_action(session,d$bs,d$land,input$p3a3)
+    d$bs       <- result$tbs
+    d$land     <- result$tland
+    updateActionButton(session,"p3a3submit",label=paste(result$msg$type,result$msg$check,sep=' , '))
+    shinyjs::toggleState("p3a3")
   })
   
   #-------------------------------------------#
   # 2.d. OBSERVE: END OF TURN
   #-------------------------------------------#
   observeEvent(input$btn_endTurn,{                                                            # observe if the 'end turn' button is pressed 
-    msg <- ''
-    
-    #-------------------------------------------#
-    # 2.d.1. CHECK/EXECUTE BATTLES
-    for(x in unique(d$bs$xPos)){                                                              # loop over all x coördinates
-      for(y in unique(d$bs$yPos)){                                                            # loop over all y coördinates
-        if(any(d$bs$xPos==x & d$bs$yPos==y) ){                                                # check if ANY units occupy the current square
-          if(length(unique(d$bs$player[d$bs$xPos==x & d$bs$yPos==y]))>1){                     # check if >1 PLAYER occupies the current square
-            battleOutcome <- battle_engine(d$bs,x,y)                                          # if so, trigger battle engine
-            d$bs <- battleOutcome$tbs
-            msg <- paste(msg,battleOutcome$msg,sep = '<br/>')
-          } 
-        }
-      }
-    }
-    
-    #-------------------------------------------#
-    # 2.d.2. HOUSEKEEPING
-    d$bs$unit[d$bs$unit=="E"] <- "P"                                                          # at the end of turn, change paratroopers to platoons
-    d$bs           <- simplify_board(d$bs)                                                    # check board if necessary
-    output$battleResult <- renderUI({HTML(msg)})
-    turn           <<- turn + 1                                                               # increase turn counter
-    year           <<- yearStart + floor(turn/yearCycle)                                      # increase year if necessary 
-    playerDef$Gold <<- playerDef$Gold + turnBonus                                             # add turn bonus
-    playerDef$Gold <<- playerDef$Gold + ifelse(floor(turn/yearCycle)-floor((turn-1)/yearCycle)==1,yearBonus,0) # in case of new year, add year bonus
-    
-    update_buttons(session)                                                                   # this will simply overwrite the current value
-    
-    #-------------------------------------------#
-    # 2.d.3. SAVE RESULTS
-    save_turn(d)                                                                              # log turn
-    
+    eot    <- end_turn(session,d$bs,d$land,output)
+    d$bs   <- eot$tbs
+    d$land <- eot$tland
+    output <- eot$output
   })
   
   #-------------------------------------------#

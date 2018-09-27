@@ -17,7 +17,6 @@
 # 0. START CREATING A PAGE
 #-------------------------------------------#
 ui <- dashboardPage(
-  
   #-----------------------------------------#
   # 1. CREATE A HEADER
   #-----------------------------------------#
@@ -40,6 +39,7 @@ ui <- dashboardPage(
   # 3. CREATE THE MAIN BODY
   #-----------------------------------------#
   dashboardBody(                                                                                   # start building the main body
+    useShinyjs(),
     tabItems(                                                                                      # separate contents into several tabs
       
       #-------------------------------------#
@@ -106,16 +106,16 @@ ui <- dashboardPage(
                   column(12/nrow(playerDef),
                          box(title = playerDef$Label[i], status = "primary", width="100%",
                              fluidRow(
-                               column(8,textInput(paste0("p",i,"a1"),NULL,paste0("P",i,"."))),
+                               column(6,textInput(paste0("p",i,"a1"),NULL,paste0("P",i,"."))),
                                actionButton(paste0("p",i,"a1submit"),"",icon=icon("cog"))
                              ),
                              fluidRow(
-                               column(8,textInput(paste0("p",i,"a2"),NULL,paste0("P",i,"."))),
+                               column(6,textInput(paste0("p",i,"a2"),NULL,paste0("P",i,"."))),
                                actionButton(paste0("p",i,"a2submit"),"",icon=icon("cog"))
                              ),
                              fluidRow(
-                               column(8,textInput(paste0("p",i,"a2"),NULL,paste0("P",i,"."))),
-                               actionButton(paste0("p",i,"a2submit"),"",icon=icon("cog"))
+                               column(6,textInput(paste0("p",i,"a3"),NULL,paste0("P",i,"."))),
+                               actionButton(paste0("p",i,"a3submit"),"",icon=icon("cog"))
                              )
                          )
                   )

@@ -24,6 +24,7 @@
 library(shiny)
 library(shinyWidgets)
 library(shinydashboard)
+library(shinyjs)
 library(png)
 library(DT)
 library(magick)
@@ -33,13 +34,14 @@ wd        <- getwd()
 unitDef   <- read.csv(file.path(wd,'www','maak_units.csv'),header=T,skip=1,stringsAsFactors = F)   # defines all units 
 playerDef <- read.csv(file.path(wd,'www','maak_spelers.csv'),header=T,skip=1,stringsAsFactors = F) # defines all players
 playerDef <- cbind(playerDef,t(col2rgb(playerDef$Color)))                                   # add player color in RGB
+msg       <- NULL
 
 # Basic game settings
 scrnRes  <- c(1600,600)                                                                     # screen resolution
 gridSize <- c(20,8)                                                                         # size of game board 
 sprRes   <- rep(floor(scrnRes[1]*0.73/gridSize[1]),2)                                       # resolution of sprites/units (scaled to match screen resolution)
 gridRes  <- gridSize*sprRes                                                                 # resolution of gameboard
-yNames   <- c(LETTERS, sapply(LETTERS, function(x) paste0(x, LETTERS)))[1:gridSize[2]]      # names of Y axis                                                    # names of Y axis
+yNames   <- c(LETTERS, sapply(LETTERS, function(x) paste0(x, LETTERS)))[1:gridSize[2]]      # names of Y axis
 xNames   <- as.character(1:gridSize[1])                                                     # names of X axis
 uNames   <- unitDef$Unit                                                                    # unit names (abbreviated)
 pNames   <- playerDef$Player                                                                # names of players (abbreviated)
@@ -87,7 +89,7 @@ for(i in 1:nrow(unitDef)){                                                      
 }
 
 #-------------------------------------------#
-# 5. PARSE ACTION
+# 1. PARSE ACTION
 #-------------------------------------------#
 #
 # This function takes in an action (written in
@@ -227,28 +229,28 @@ execute_move <- function(tbs,tland,player,unit,quantity,x1,y1,path){
       if(yInd+1 <= length(yNames)){                                            # then position is valid, so execute step
         tbs$yPos[rowFrom] <- yNames[yInd+1]                                    # update location (coördinate)
         tbs$yRes[rowFrom] <- tbs$yRes[rowFrom] + sprRes[2]                     # update location (in pixels)
-        tland <- updateMapOwner(tland,tbs$xRes[rowFrom],tbs$yRes[rowFrom],player) # update ownership of tile to new player
+        tland <- updateMapOwner(tland,tbs$xPos[rowFrom],tbs$yPos[rowFrom],player) # update ownership of tile to new player
       }
     } else if(nextLoc == 'D' | nextLoc == 'Z'){
       yInd <- which(yNames %in% tbs$yPos[rowFrom])                             # now do the same for 'down/south' movements
       if(yInd >= 2){                                            
         tbs$yPos[rowFrom] <- yNames[yInd-1]                   
         tbs$yRes[rowFrom] <- tbs$yRes[rowFrom] - sprRes[2]
-        tland <- updateMapOwner(tland,tbs$xRes[rowFrom],tbs$yRes[rowFrom],player)
+        tland <- updateMapOwner(tland,tbs$xPos[rowFrom],tbs$yPos[rowFrom],player)
       }
     } else if(nextLoc == 'L' | nextLoc == 'W'){
       xInd <- which(xNames %in% tbs$xPos[rowFrom])                             # now do the same for 'left/west' movements           
       if(xInd >= 2){                                             
         tbs$xPos[rowFrom] <- xNames[xInd-1]                   
         tbs$xRes[rowFrom] <- tbs$xRes[rowFrom] - sprRes[1]
-        tland <- updateMapOwner(tland,tbs$xRes[rowFrom],tbs$yRes[rowFrom],player)
+        tland <- updateMapOwner(tland,tbs$xPos[rowFrom],tbs$yPos[rowFrom],player)
       }
     } else if(nextLoc == 'R' | nextLoc == 'O'){                                # now do the same for 'right/east' movements
       xInd <- which(xNames %in% tbs$xPos[rowFrom])                      
       if(xInd+1 <= length(xNames)){                                     
         tbs$xPos[rowFrom] <- xNames[xInd+1]                   
         tbs$xRes[rowFrom] <- tbs$xRes[rowFrom] + sprRes[1]
-        tland <- updateMapOwner(tland,tbs$xRes[rowFrom],tbs$yRes[rowFrom],player)
+        tland <- updateMapOwner(tland,tbs$xPos[rowFrom],tbs$yPos[rowFrom],player)
       }
     }
     
@@ -418,66 +420,150 @@ battle_engine <- function(tbs, x, y){
 #
 #-------------------------------------------#
 
-updateMapOwner <- function(land,x1,y1,player){
-  if(is.character(x1)){x1 <- pos2res(x1,xNames)}                               # if x is given as position, find corresponding pixel value
-  if(is.character(y1)){y1 <- pos2res(y1,yNames)}                               # if y is given as position, find corresponding pixel value
+updateMapOwner <- function(land,x,y,player){
   
-  y1 <- gridRes[2]-sprRes[2]-y1                                                # our coördinates start bottom-left, but this image will be drawn from top-left rasterplot, which starts top-left
-  y2 <- y1+sprRes[2]                                                           # ... so we need to make sure to 'flip' the y axis
-  x2 <- x1+sprRes[1]
+  x <- which(x == xNames)
+  y <- gridSize[2] - which(y == yNames) + 1
   
-  if(length(player)>1){                                                        # in case of disputed land, ownership is undecided
-    land[y1:y2,x1:x2,1:4] <- 0                                                 # so put everything to 0, including alpha
+  if(length(player)>1){                                                                    # in case of disputed land, ownership is undecided
+    land[y,x,1:4] <- 0                                                                     # so put everything to 0, including alpha
   } else {
-    land[y1:y2,x1:x2,1] <- playerDef$red[playerDef$Player==player]/255         # otherwise, assing player color
-    land[y1:y2,x1:x2,2] <- playerDef$green[playerDef$Player==player]/255
-    land[y1:y2,x1:x2,3] <- playerDef$blue[playerDef$Player==player]/255
-    land[y1:y2,x1:x2,4] <- mapAlpha
+    land[y,x,1] <- playerDef$red[playerDef$Player==player]/255                             # otherwise, assing player color
+    land[y,x,2] <- playerDef$green[playerDef$Player==player]/255
+    land[y,x,3] <- playerDef$blue[playerDef$Player==player]/255
+    land[y,x,4] <- mapAlpha
   }
   return(land)
 }
 
-# Basic land ownership definition
-land <- array(rep(0,gridRes[2]*gridRes[1]*4),c(gridRes[2],gridRes[1],4))
-for(i in 1:nrow(boardState)){
-  land <- updateMapOwner(land,boardState$xRes[i],boardState$yRes[i],boardState$player[i])
+land <- array(rep(0,gridSize[2]*gridSize[1]*4),c(gridSize[2],gridSize[1],4))               # create land variable after function definition!
+for(i in 1:nrow(boardState)){                                                              # assign starting tiles based on existing units
+  land <- updateMapOwner(land,boardState$xPos[i],boardState$yPos[i],boardState$player[i])
 }
 
 # Initiate game variable
 game <- NULL
-game[[paste(turn)]][['bs']] <- boardState
+game[[paste(turn)]][['bs']]   <- boardState
 game[[paste(turn)]][['land']] <- land
 
 #-------------------------------------------#
-# 7. RENDER GAME BOARD
+# 7. EXECUTE ACTION
+#-------------------------------------------#
+#
+# Wrapper function to perform an entire action in one function.
+# This function wraps parse_action, check_action, buy_unit, execute_move.
+# It will also apply updateMapOwner where necessary.
+#
+#-------------------------------------------#
+
+do_action <- function(session,tbs,tland,action){
+  act <- parse_action(action)
+
+  msg <- NULL
+  msg$type <- act$type
+  msg$parse <- act$msg
+  
+  if(msg$type=="succes"){
+    chk       <- check_action(tbs,act$player,act$unit,act$quantity,act$x1,act$y1,act$path)
+    msg$check <- chk$msg
+    msg$type  <- chk$type
+  }
+  
+  if(msg$type=="succes"){                                                                   # IF the action is valid (i.e. success)
+    if(is.na(act$path)){
+      tbs    <- buy_unit(tbs,act$player,act$unit,act$quantity,act$x1,act$y1)
+      tland  <- updateMapOwner(tland,act$x1,act$y1,act$player)
+      msg$outcome <- 'unit gekocht'
+    } else {
+      move   <- execute_move(tbs,tland,act$player,act$unit,act$quantity,act$x1,act$y1,act$path) # THEN actually perform the move
+      tbs    <- move$tbs
+      tland  <- move$tland
+      msg$outcome <- move$msg
+    }
+  }
+  
+  update_buttons(session)
+  return(list(tbs=tbs,tland=tland,msg=msg))
+}
+
+#-------------------------------------------#
+# 8. RENDER GAME BOARD
 #-------------------------------------------#
 #
 # Basic function to render the game board
 #
 #-------------------------------------------#
 render_board <- function(tbs,tland){
-  par(mar=rep(0,4))                                                            # set figure margins to 0
-  plot.window(xlim=c(0,gridRes[1]),ylim=c(0,gridRes[2]))                       # create a window with correct size
-  rasterImage(spr[['board']],0,0,gridRes[1],gridRes[2])                        # create 'base layer' of game map to start drawing on
-  rasterImage(tland,0,0,gridRes[1],gridRes[2],interpolate=F)                   # create 'base layer' of game map to start drawing on
+  par(mar=rep(0,4))                                                                        # set figure margins to 0
+  plot.window(xlim=c(0,gridRes[1]),ylim=c(0,gridRes[2]))                                   # create a window with correct size
+  rasterImage(spr[['board']],0,0,gridRes[1],gridRes[2])                                    # create 'base layer' of game map to start drawing on
+  rasterImage(tland,0,0,gridRes[1],gridRes[2],interpolate=F)                               # create 'base layer' of game map to start drawing on
   
-  for(i in 1:nrow(tbs)){                                                       # loop over all units in boardState
-    rasterImage(spr[[paste0(tbs$unit[i],tbs$player[i])]],                      # cast sprite pointer (char) to variable, and draw
-                tbs[i,'xRes'],                                                 # define correct x1,y1,x2,y2 coördinates (in pixels)
+  for(i in 1:nrow(tbs)){                                                                   # loop over all units in boardState
+    rasterImage(spr[[paste0(tbs$unit[i],tbs$player[i])]],                                  # cast sprite pointer (char) to variable, and draw
+                tbs[i,'xRes'],                                                             # define correct x1,y1,x2,y2 coördinates (in pixels)
                 tbs[i,'yRes'],
                 tbs[i,'xRes']+sprRes[1],
                 tbs[i,'yRes']+sprRes[2])
     text(x=tbs$xRes[i]+sprRes[1]*0.8,y=tbs$yRes[i]+sprRes[2]*0.8,tbs$quantity[i],cex=1.3, font=2)
   }
   
-  abline(h=seq(0,gridRes[2],sprRes[2]), col="darkgrey", lwd=4)                 # horizontal lines. Draw these LAST to mask potential sprite-overlaps
-  abline(v=seq(0,gridRes[1],sprRes[1]), col="darkgrey", lwd=4)                 # vertical lines to complete the grid/raster
-  text(x=boardDef$xRes+sprRes[1]/10, y = gridRes[2]+sprRes[1]/10, labels = boardDef$xPos) # create coördinate labels along x axis
-  text(x=-sprRes[1]/10, y = boardDef$yRes+sprRes[1]/10, labels = boardDef$yPos) # create coördinate labels along y axis
+  abline(h=seq(0,gridRes[2],sprRes[2]), col="darkgrey", lwd=4)                             # horizontal lines. Draw these LAST to mask potential sprite-overlaps
+  abline(v=seq(0,gridRes[1],sprRes[1]), col="darkgrey", lwd=4)                             # vertical lines to complete the grid/raster
+  text(x=boardDef$xRes+sprRes[1]/10, y = gridRes[2]+sprRes[1]/10, labels = boardDef$xPos)  # create coördinate labels along x axis
+  text(x=-sprRes[1]/10, y = boardDef$yRes+sprRes[1]/10, labels = boardDef$yPos)            # create coördinate labels along y axis
 }
 
 #-------------------------------------------#
-# 8. SAVE TURN
+# 9. END TURN
+#-------------------------------------------#
+#
+# This is a key function. end_turn() will take care of ending a turn.
+# It will execute all open actions, evaluating their effect and update the board.
+# This includes checking for battle scenarios and resolving them, as well as doing basic housekeeping tasks.
+# It will then apply player bonusses where needed, update key variables (turn, year, etc.)
+# If required, the function will also save the game state (in .rds, .png and/or .csv)
+#
+#---------------------------------------------#
+
+end_turn <- function(session,tbs,tland,output){
+  msg <- ''
+  
+  #-------------------------------------------#
+  # 9.1. CHECK/EXECUTE BATTLES
+  for(x in unique(tbs$xPos)){                                                              # loop over all x coördinates
+    for(y in unique(tbs$yPos)){                                                            # loop over all y coördinates
+      if(any(tbs$xPos==x & tbs$yPos==y) ){                                                 # check if ANY units occupy the current square
+        if(length(unique(tbs$player[tbs$xPos==x & tbs$yPos==y]))>1){                       # check if >1 PLAYER occupies the current square
+          battleOutcome <- battle_engine(tbs,x,y)                                          # if so, trigger battle engine
+          tbs <- battleOutcome$tbs
+          msg <- paste(msg,battleOutcome$msg,sep = '<br/>')
+        }
+      }
+    }
+  }
+  
+  #-------------------------------------------#
+  # 9.2. HOUSEKEEPING
+  tbs$unit[tbs$unit=="E"] <- "P"                                                           # at the end of turn, change paratroopers to platoons
+  tbs           <- simplify_board(tbs)                                                     # check board if necessary
+  output$battleResult <- renderUI({HTML(msg)})
+  turn           <<- turn + 1                                                              # increase turn counter
+  year           <<- yearStart + floor(turn/yearCycle)                                     # increase year if necessary
+  playerDef$Gold <<- playerDef$Gold + turnBonus                                            # add turn bonus
+  playerDef$Gold <<- playerDef$Gold + ifelse(floor(turn/yearCycle)-floor((turn-1)/yearCycle)==1,yearBonus,0) # in case of new year, add year bonus
+  
+  update_buttons(session)                                                                  # this will simply overwrite the current value
+  
+  #-------------------------------------------#
+  # 9.3. SAVE RESULTS
+  # save_turn(d)                                                                           # log turn
+  
+  return(list(tbs=tbs,tland=tland,output=output))
+}
+
+#-------------------------------------------#
+# 10. SAVE TURN
 #-------------------------------------------#
 #
 # Takes care of saving/storing end-of-turn results
@@ -491,22 +577,22 @@ render_board <- function(tbs,tland){
 #-------------------------------------------#
 
 save_turn <- function(d){
-  game[[paste(turn)]][['bs']] <<- d$bs                                         # store boardstate
-  game[[paste(turn)]][['land']] <<- d$land                                     # store land ownership
+  game[[paste(turn)]][['bs']] <<- d$bs                                                     # store boardstate
+  game[[paste(turn)]][['land']] <<- d$land                                                 # store land ownership
   
-  if(as.numeric(turn) < max(as.numeric(names(game)))){                         # if a parallel universe is started ...
-    game[paste(seq(turn+1,max(as.numeric(names(game)))))] <<- NULL             # ... destroy the old universe
+  if(as.numeric(turn) < max(as.numeric(names(game)))){                                     # if a parallel universe is started ...
+    game[paste(seq(turn+1,max(as.numeric(names(game)))))] <<- NULL                         # ... destroy the old universe
   }
   
-  saveRDS(game,file.path(wd,'savegame',paste0("Game_",gameID,"_turn_",turn,".rds"))) # save entire game
-  png(file.path(wd,'savegame',paste0("Game_",gameID,"_turn_",turn,'.png')),    # save png of boardState
+  saveRDS(game,file.path(wd,'savegame',paste0("Game_",gameID,"_turn_",turn,".rds")))       # save entire game
+  png(file.path(wd,'savegame',paste0("Game_",gameID,"_turn_",turn,'.png')),                # save png of boardState
       width=gridRes[1],height=gridRes[2])
   plot.new()
   render_board(d$bs,d$land)
   dev.off()
   
-  if(turn==2){                                                                 # the first turn is not automatically saved, because it is not the result of an end-of-turn event
-    png(file.path(wd,'savegame',paste0("Game_",gameID,"_turn_",turn-1,'.png')),# save png of boardState
+  if(turn==2){                                                                             # the first turn is not automatically saved, because it is not the result of an end-of-turn event
+    png(file.path(wd,'savegame',paste0("Game_",gameID,"_turn_",turn-1,'.png')),            # save png of boardState
         width=gridRes[1],height=gridRes[2])
     plot.new()
     render_board(game[['1']][['bs']],game[['1']][['land']])
@@ -515,25 +601,25 @@ save_turn <- function(d){
 }
 
 #-------------------------------------------#
-# 10 SIMPLIFY BOARD
+# 11. SIMPLIFY BOARD
 #-------------------------------------------#
 simplify_board <- function(tbs){
-  tbs$xRes <- match(tbs$xPos,xNames) * sprRes[1]-sprRes[1]                    # double-check x pixel coördinates
-  tbs$yRes <- match(tbs$yPos,yNames) * sprRes[2]-sprRes[2]                    # check y pixel coördinates
+  tbs$xRes <- match(tbs$xPos,xNames) * sprRes[1]-sprRes[1]                                 # double-check x pixel coördinates
+  tbs$yRes <- match(tbs$yPos,yNames) * sprRes[2]-sprRes[2]                                 # check y pixel coördinates
   
   # remove duplicates
-  tbs <- setNames(aggregate(tbs[, c("quantity")],                             # remove any duplicate rows, and return boardstate
-                            tbs[, names(tbs)[!names(tbs) %in% c("quantity")]],# this will take all rows that are identical
-                            FUN = sum, na.rm = TRUE),                         # ... and collapse them while summing the quantity
-                  c(names(tbs)[!names(tbs) %in% c("quantity")],"quantity"))   # finally, make sure column names are correct
+  tbs <- setNames(aggregate(tbs[, c("quantity")],                                          # remove any duplicate rows, and return boardstate
+                            tbs[, names(tbs)[!names(tbs) %in% c("quantity")]],             # this will take all rows that are identical
+                            FUN = sum, na.rm = TRUE),                                      # ... and collapse them while summing the quantity
+                  c(names(tbs)[!names(tbs) %in% c("quantity")],"quantity"))                # finally, make sure column names are correct
   return(tbs)
 }
 
 #-------------------------------------------#
-# 11. UPDATE SCORE BUTTONS
+# 12. UPDATE SCORE BUTTONS
 #-------------------------------------------#
-update_buttons <- function(session){                                          # function will only work for 1 session at a time
-  for(i in 1:nrow(playerDef)){                                                # for every player ...
+update_buttons <- function(session){                                                       # function will only work for 1 session at a time
+  for(i in 1:nrow(playerDef)){                                                             # for every player ...
     updateActionButton(session,paste0("p",i,"Score"),label=paste(playerDef$Label[i],playerDef$Gold[i])) # ... update the gold-button
   }
   updateActionButton(session,"turn",paste("turn",turn))
@@ -541,11 +627,19 @@ update_buttons <- function(session){                                          # 
 }
 
 #-------------------------------------------#
-# 12 POS2RES
+# 13. POS2RES
 #-------------------------------------------#
-pos2res <- function(pos,names){                                               # calculate resolution in pixels from a position (origin: bottom-left)
-  res = which(toupper(pos) == names)*sprRes[1]-sprRes[1]                      # make sure position is in uppercase
+pos2res <- function(pos,names){                                                            # calculate resolution in pixels from a position (origin: bottom-left)
+  res = which(toupper(pos) == names)*sprRes[1]-sprRes[1]                                   # make sure position is in uppercase
   return(res)
+}
+
+lazy_check <- function(tbs,action){
+  prs <- parse_action(action)
+  if(prs$type=="succes"){
+    prs <- check_action(tbs,prs$player,prs$unit,prs$quantity,prs$x1,prs$y1,prs$path)
+  }
+  return(prs)
 }
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
