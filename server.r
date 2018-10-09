@@ -17,38 +17,54 @@
 # 0. CREATE A NEW SERVER FUNCTION
 #-------------------------------------------#
 server <- function(input, output, session) {
+  usr <- ifelse(isolate(session$clientData$url_hostname)=="127.0.0.1","master","slave")
+  shinyjs::runjs("document.getElementsByClassName('sidebar-toggle')[0].style.visibility = 'hidden';")     # by default, sidebar navigation is blocked
   
+  if(usr=="master"){                                              # this means local host is viewing (i.e. master)
+    shinyjs::runjs("document.getElementsByClassName('sidebar-toggle')[0].style.visibility = 'visible';")  # if so, enable sidebar navigation
+    updateTabItems(session, "sidebar", selected = "Main")                                                 # if so, make main tab active
+  }
+
   #-------------------------------------------#
   # 1. DEFINE USER VARIABLES
   #-------------------------------------------#
   d   <- reactiveValues(bs=boardState,land=land)                                              # reactive values are special, and (should) do downstream cascading if they are updated
   sel <- reactiveValues(row=1)                                                                # i.e. if you update this value, all outputs that use this value get updated too
+  t5s <- reactiveTimer(5000)                                                                  # this can be used as a reactive timer of 2seconds
   
   #-------------------------------------------#
   # 2.a. OBSERVE: MOVE BUTTONS
   #-------------------------------------------#                                               # observeEvent listens for an event, and then executes a code chunk
   observeEvent(input$btn_up,{                                                                 # in this case, listen to 'button up' event
-    d$bs[sel$row,'yRes'] = d$bs[sel$row,'yRes'] + sprRes[2]                                   # if 'button up' is pressed, move the unit up by 1x the sprite resolution
-    d$bs[sel$row,'yPos'] = LETTERS[which(LETTERS %in% d$bs[sel$row,'yPos'])+1]                # also update the Y coördinate
-    d$land <- updateMapOwner(d$land,d$bs$xPos[sel$row],d$bs$yPos[sel$row],d$bs$player[sel$row])
+    if(which(d$bs[sel$row,'yPos']==yNames)<length(yNames)){
+      d$bs[sel$row,'yRes'] = d$bs[sel$row,'yRes'] + sprRes[2]
+      d$bs[sel$row,'yPos'] = yNames[which(d$bs[sel$row,'yPos']==yNames)+1]                    #   as.character(as.numeric(d$bs[sel$row,'xPos'])-1)
+      d$land <- updateMapOwner(d$land,d$bs$xPos[sel$row],d$bs$yPos[sel$row],d$bs$player[sel$row])
+    }
   })
   
   observeEvent(input$btn_down,{                                                               # create similar interactions for the other buttons
-    d$bs[sel$row,'yRes'] = d$bs[sel$row,'yRes'] - sprRes[2]
-    d$bs[sel$row,'yPos'] = LETTERS[which(LETTERS %in% d$bs[sel$row,'yPos'])-1]
-    d$land <- updateMapOwner(d$land,d$bs$xPos[sel$row],d$bs$yPos[sel$row],d$bs$player[sel$row])
+    if(which(d$bs[sel$row,'yPos']==yNames)>1){
+      d$bs[sel$row,'yRes'] = d$bs[sel$row,'yRes'] - sprRes[2]
+      d$bs[sel$row,'yPos'] = yNames[which(d$bs[sel$row,'yPos']==yNames)-1]                    #   as.character(as.numeric(d$bs[sel$row,'xPos'])-1)
+      d$land <- updateMapOwner(d$land,d$bs$xPos[sel$row],d$bs$yPos[sel$row],d$bs$player[sel$row])
+    }
   })
   
   observeEvent(input$btn_left,{
-    d$bs[sel$row,'xRes'] = d$bs[sel$row,'xRes'] - sprRes[1]
-    d$bs[sel$row,'xPos'] = as.character(as.numeric(d$bs[sel$row,'xPos'])-1)
-    d$land <- updateMapOwner(d$land,d$bs$xPos[sel$row],d$bs$yPos[sel$row],d$bs$player[sel$row])
+    if(which(d$bs[sel$row,'xPos']==xNames)>1){
+      d$bs[sel$row,'xRes'] = d$bs[sel$row,'xRes'] - sprRes[1]
+      d$bs[sel$row,'xPos'] = xNames[which(d$bs[sel$row,'xPos']==xNames)-1]                    #   as.character(as.numeric(d$bs[sel$row,'xPos'])-1)
+      d$land <- updateMapOwner(d$land,d$bs$xPos[sel$row],d$bs$yPos[sel$row],d$bs$player[sel$row])
+    }
   })
   
   observeEvent(input$btn_right,{
-    d$bs[sel$row,'xRes'] = d$bs[sel$row,'xRes'] + sprRes[1]
-    d$bs[sel$row,'xPos'] = as.character(as.numeric(d$bs[sel$row,'xPos'])+1)
-    d$land <- updateMapOwner(d$land,d$bs$xPos[sel$row],d$bs$yPos[sel$row],d$bs$player[sel$row])
+    if(which(d$bs[sel$row,'xPos']==xNames)<length(xNames)){
+      d$bs[sel$row,'xRes'] = d$bs[sel$row,'xRes'] + sprRes[1]
+      d$bs[sel$row,'xPos'] = xNames[which(d$bs[sel$row,'xPos']==xNames)+1]                    #   as.character(as.numeric(d$bs[sel$row,'xPos'])-1)
+      d$land <- updateMapOwner(d$land,d$bs$xPos[sel$row],d$bs$yPos[sel$row],d$bs$player[sel$row])
+    }
   })
   
   #-------------------------------------------#
@@ -77,85 +93,65 @@ server <- function(input, output, session) {
   #-------------------------------------------#
   # 2.c. OBSERVE: ACTION SUBMISSION
   #-------------------------------------------#
-  observe({updateActionButton(session,"p1a1submit",label=paste(lazy_check(d$bs,input$p1a1)[2]))})
-  observe({updateActionButton(session,"p1a2submit",label=paste(lazy_check(d$bs,input$p1a2)[2]))})
-  observe({updateActionButton(session,"p1a3submit",label=paste(lazy_check(d$bs,input$p1a3)[2]))})
-  observe({updateActionButton(session,"p2a1submit",label=paste(lazy_check(d$bs,input$p2a1)[2]))})
-  observe({updateActionButton(session,"p2a2submit",label=paste(lazy_check(d$bs,input$p2a2)[2]))})
-  observe({updateActionButton(session,"p2a3submit",label=paste(lazy_check(d$bs,input$p2a3)[2]))})
-  observe({updateActionButton(session,"p3a1submit",label=paste(lazy_check(d$bs,input$p3a1)[2]))})
-  observe({updateActionButton(session,"p3a2submit",label=paste(lazy_check(d$bs,input$p3a2)[2]))})
-  observe({updateActionButton(session,"p3a3submit",label=paste(lazy_check(d$bs,input$p3a3)[2]))})
-  
-  observeEvent(input$p1a1submit,{
-    result     <- do_action(session,d$bs,d$land,input$p1a1)
-    d$bs       <- result$tbs
-    d$land     <- result$tland
-    updateActionButton(session,"p1a1submit",label=paste(result$msg$type,result$msg$check,sep=' , '))
-    shinyjs::toggleState("p1a1")
-  })
-  observeEvent(input$p1a2submit,{
-    result     <- do_action(session,d$bs,d$land,input$p1a2)
-    d$bs       <- result$tbs
-    d$land     <- result$tland
-    updateActionButton(session,"p1a2submit",label=paste(result$msg$type,result$msg$check,sep=' , '))
-    shinyjs::toggleState("p1a2")
-  })
-  observeEvent(input$p1a3submit,{
-    result     <- do_action(session,d$bs,d$land,input$p1a3)
-    d$bs       <- result$tbs
-    d$land     <- result$tland
-    updateActionButton(session,"p1a3submit",label=paste(result$msg$type,result$msg$check,sep=' , '))
-    shinyjs::toggleState("p1a3")
-  })
-  observeEvent(input$p2a1submit,{
-    result     <- do_action(session,d$bs,d$land,input$p2a1)
-    d$bs       <- result$tbs
-    d$land     <- result$tland
-    updateActionButton(session,"p2a1submit",label=paste(result$msg$type,result$msg$check,sep=' , '))
-    shinyjs::toggleState("p2a1")
-  })
-  observeEvent(input$p2a2submit,{
-    result     <- do_action(session,d$bs,d$land,input$p2a2)
-    d$bs       <- result$tbs
-    d$land     <- result$tland
-    updateActionButton(session,"p2a2submit",label=paste(result$msg$type,result$msg$check,sep=' , '))
-    shinyjs::toggleState("p2a2")
-  })
-  observeEvent(input$p2a3submit,{
-    result     <- do_action(session,d$bs,d$land,input$p2a3)
-    d$bs       <- result$tbs
-    d$land     <- result$tland
-    updateActionButton(session,"p2a3submit",label=paste(result$msg$type,result$msg$check,sep=' , '))
-    shinyjs::toggleState("p2a3")
-  })
-  observeEvent(input$p3a1submit,{
-    result     <- do_action(session,d$bs,d$land,input$p3a1)
-    d$bs       <- result$tbs
-    d$land     <- result$tland
-    updateActionButton(session,"p3a1submit",label=paste(result$msg$type,result$msg$check,sep=' , '))
-    shinyjs::toggleState("p3a1")
-  })
-  observeEvent(input$p3a2submit,{
-    result     <- do_action(session,d$bs,d$land,input$p3a2)
-    d$bs       <- result$tbs
-    d$land     <- result$tland
-    updateActionButton(session,"p3a2submit",label=paste(result$msg$type,result$msg$check,sep=' , '))
-    shinyjs::toggleState("p3a2")
-  })
-  observeEvent(input$p3a3submit,{
-    result     <- do_action(session,d$bs,d$land,input$p3a3)
-    d$bs       <- result$tbs
-    d$land     <- result$tland
-    updateActionButton(session,"p3a3submit",label=paste(result$msg$type,result$msg$check,sep=' , '))
-    shinyjs::toggleState("p3a3")
-  })
+  lapply(                                                                                                               # start creating observeEvents for player actions
+    X = 1:nrow(playerDef),                                                                                              # create one set for each player
+    FUN = function(i){
+      observeEvent(input[[paste0(playerDef$Player[i],"a1submit")]], {                                                   # set up listener for action 1
+        result <- do_action(session,d$bs,d$land,input[[paste0(playerDef$Player[i],"a1")]])                              # if pressed, execute action
+        d$bs <- result$tbs                                                                                              # update boardState
+        d$land <- result$tland                                                                                          # update land ownership
+        updateActionButton(session,paste0(playerDef$Player[i],"a1submit"),label=paste(result$msg$type,result$msg$action,sep=" , "))   # update action button
+        shinyjs::toggleState(paste0(playerDef$Player[i],"a1"))                                                          # lock action button
+        msglog[[paste0(playerDef$Player[i],"a1")]] <<- result$msg                                        # log outcome
+      })
+      observeEvent(input[[paste0(playerDef$Player[i],"a2submit")]], {                                                   # do the same for action 2 ...
+        result <- do_action(session,d$bs,d$land,input[[paste0(playerDef$Player[i],"a2")]])
+        d$bs <- result$tbs
+        d$land <- result$tland
+        updateActionButton(session,paste0(playerDef$Player[i],"a2submit"),label=paste(result$msg$type,result$msg$action,sep=" , "))
+        shinyjs::toggleState(paste0(playerDef$Player[i],"a2"))
+        msglog[[paste0(playerDef$Player[i],"a2")]] <<- result$msg
+      })
+      observeEvent(input[[paste0(playerDef$Player[i],"a3submit")]], {
+        result <- do_action(session,d$bs,d$land,input[[paste0(playerDef$Player[i],"a3")]])
+        d$bs <- result$tbs
+        d$land <- result$tland
+        updateActionButton(session,paste0(playerDef$Player[i],"a3submit"),label=paste(result$msg$type,result$msg$action,sep=" , "))
+        shinyjs::toggleState(paste0(playerDef$Player[i],"a3"))
+        msglog[[paste0(playerDef$Player[i],"a3")]] <<- result$msg
+      })
+      observe({t5s()                                                                                                    # refresh this part every 5 seconds
+        if(!actions[[paste0(playerDef$Player[i],"1")]]==''){                                                            # check if remote/slave player has updated their action
+          updateTextInput(session,paste0(playerDef$Player[i],"a1"),NULL,actions[[paste0(playerDef$Player[i],"1")]])     # if so, copy it to our own action input field
+        }
+      })
+      observe({t5s()                                                                                                    # refresh this part every 5 seconds
+        if(!actions[[paste0(playerDef$Player[i],"2")]]==''){                                                            # check if remote/slave player has updated their action
+          updateTextInput(session,paste0(playerDef$Player[i],"a2"),NULL,actions[[paste0(playerDef$Player[i],"2")]])     # if so, copy it to our own action input field
+        }
+      })
+      observe({t5s()                                                                                                    # refresh this part every 5 seconds
+        if(!actions[[paste0(playerDef$Player[i],"3")]]==''){                                                            # check if remote/slave player has updated their action
+          updateTextInput(session,paste0(playerDef$Player[i],"a3"),NULL,actions[[paste0(playerDef$Player[i],"3")]])     # if so, copy it to our own action input field
+        }
+      })
+      observe({updateActionButton(session,paste0(playerDef$Player[i],'a1submit'),                                       # check if player is writing an action
+                                  label=paste(parse_and_check(d$bs,input[[paste0(playerDef$Player[i],'a1')]])$action))  # if so, evaluate the action and report back on validity
+      })
+      observe({updateActionButton(session,paste0(playerDef$Player[i],'a2submit'),
+                                  label=paste(parse_and_check(d$bs,input[[paste0(playerDef$Player[i],'a2')]])$action))
+      })
+      observe({updateActionButton(session,paste0(playerDef$Player[i],'a3submit'),
+                                  label=paste(parse_and_check(d$bs,input[[paste0(playerDef$Player[i],'a3')]])$action))
+      })
+    }
+  )
   
   #-------------------------------------------#
   # 2.d. OBSERVE: END OF TURN
   #-------------------------------------------#
   observeEvent(input$btn_endTurn,{                                                            # observe if the 'end turn' button is pressed 
-    eot    <- end_turn(session,d$bs,d$land,output)
+    eot    <- end_turn(session,d$bs,d$land,input,output)
     d$bs   <- eot$tbs
     d$land <- eot$tland
     output <- eot$output
@@ -212,6 +208,56 @@ server <- function(input, output, session) {
       dev.off()
     }
   )
+  
+  #-------------------------------------------#
+  # 5. OBSERVE: REMOVE PLAYER LOGIC
+  #-------------------------------------------#
+  px  <- NULL                                                                      # variable to identify remote player
+  observe({                                                                      
+    t5s()                                                                          # every 5 seconds ...
+    if(input$turnSlave < turn & usr=="slave"){                                     # then a new turn has started
+      d$bs <<- game[[paste(turn)]]$bs
+      d$land <<- game[[paste(turn)]]$land
+    }
+    updateActionButton(session,"turnSlave",paste("turn:",turn))                    # update global variables
+    updateActionButton(session,"yearSlave",paste("year:",year))
+    updateActionButton(session,"scoreSlave",paste("score:",px$Gold))
+    output$reportSlave <- renderUI({HTML(game[[paste(turn)]][[paste0('report',px$Player)]])})
+  })
+
+  observeEvent(input$pxpwsubmit,{                                                  # user submits password
+    if(input$pxpw %in% playerDef$Password){
+      px <<- playerDef[input$pxpw == playerDef$Password,]
+      updateTextInput(session,"pxpw",value=paste0("Welkom ",px$Label,"!"))
+      output$pxa1 <- renderUI(textInput("pxa1",NULL,NULL))
+      output$pxa2 <- renderUI(textInput("pxa2",NULL,NULL))
+      output$pxa3 <- renderUI(textInput("pxa3",NULL,NULL))
+      output$pxa1submit <- renderUI(actionButton("pxa1submit","",icon=icon("cog"),width="100%"))
+      output$pxa2submit <- renderUI(actionButton("pxa2submit","",icon=icon("cog"),width="100%"))
+      output$pxa3submit <- renderUI(actionButton("pxa3submit","",icon=icon("cog"),width="100%"))
+      shinyjs::show(id = "pxgameoverviewdiv")
+      shinyjs::show(id = "pxactioninputdiv")
+      shinyjs::show(id = "pxreportdiv")
+      shinyjs::hide(id = "pxpw")
+      shinyjs::hide(id="pxpwsubmit")
+    }
+  })
+  
+  lapply(                                                                                                               # start creating observeEvents for player actions
+    X = 1:3,                                                                                                            # create one set for each player
+    FUN = function(i){
+      observe({
+        updateActionButton(session,paste0('pxa',i,'submit'),label=paste(parse_and_check(d$bs,paste0(px$Player,'.',input[[paste0('pxa',i)]]))$action))
+        observeEvent(input[[paste0('pxa',i,'submit')]],{
+          updateActionButton(session,paste0("pxa",i,"submit"),"Actie doorgegeven")
+          shinyjs::disable(paste0('pxa',i))
+          shinyjs::disable(paste0('pxa',i,'submit'))
+          actions[[paste0(px$Player,i)]] <<- paste0(px$Player,'.',input[[paste0("pxa",i)]])
+        })
+      })
+    }
+  )
+  
 }
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

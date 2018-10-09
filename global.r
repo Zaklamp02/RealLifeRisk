@@ -34,15 +34,15 @@ wd        <- getwd()
 unitDef   <- read.csv(file.path(wd,'www','maak_units.csv'),header=T,skip=1,stringsAsFactors = F)   # defines all units 
 playerDef <- read.csv(file.path(wd,'www','maak_spelers.csv'),header=T,skip=1,stringsAsFactors = F) # defines all players
 playerDef <- cbind(playerDef,t(col2rgb(playerDef$Color)))                                   # add player color in RGB
-msg       <- NULL
+msglog       <- list()
 
 # Basic game settings
 scrnRes  <- c(1600,600)                                                                     # screen resolution
 gridSize <- c(20,8)                                                                         # size of game board 
 sprRes   <- rep(floor(scrnRes[1]*0.73/gridSize[1]),2)                                       # resolution of sprites/units (scaled to match screen resolution)
 gridRes  <- gridSize*sprRes                                                                 # resolution of gameboard
-yNames   <- c(LETTERS, sapply(LETTERS, function(x) paste0(x, LETTERS)))[1:gridSize[2]]      # names of Y axis
-xNames   <- as.character(1:gridSize[1])                                                     # names of X axis
+xNames   <- c(LETTERS, sapply(LETTERS, function(x) paste0(x, LETTERS)))[1:gridSize[1]]      # names of Y axis
+yNames   <- as.character(1:gridSize[2])                                                     # names of X axis
 uNames   <- unitDef$Unit                                                                    # unit names (abbreviated)
 pNames   <- playerDef$Player                                                                # names of players (abbreviated)
 
@@ -56,6 +56,8 @@ turnBonus <- 500
 yearBonus <- 1500
 mapAlpha  <- 0.3                                                                            # alpha value for player/map occupation tiles
 gameID    <- paste0(LETTERS[sample(1:26,1)],LETTERS[sample(1:26,1)],LETTERS[sample(1:26,1)],sample(111:999,1))
+scanRadius<- 2                                                                              # scan radius (+/-x,y around center coördinate)
+bombRadius<- 0                                                                              # bomb radius (+/-x,y around center coördinate)
 
 # Basic board definition
 boardDef <- data.frame(xPos     = rep(xNames,each=gridSize[2]),                             # all possible X coördinates (in grid)
@@ -88,6 +90,14 @@ for(i in 1:nrow(unitDef)){                                                      
   }
 }
 
+# KEY talking variables:
+actions <- list()
+for(i in playerDef$Player){
+  for(j in 1:3){
+    actions[[paste0(i,j)]] <- ''
+  }
+}
+
 #-------------------------------------------#
 # 1. PARSE ACTION
 #-------------------------------------------#
@@ -108,25 +118,30 @@ parse_action <- function(action){
   out <- list()
   if(is.character(action)){                                                    # then input is in character format
     act <- unlist(strsplit(action,'[.]'))                                      # try to split on '.' (CAN IMPROVE LATER!!!)
-    if(length(act)<3){                                                         # then too few elements
-      out$type <- 'fout'                                                       # log short message
-      out$msg  <- 'te weinig elementen'                                        # log long message
+    
+    if(length(act)==1 & act[1] %in% playerDef$Player){                         # then action is the pre-defined "Px." format
+      out$type   <- 'fout'
+      out$action <- ''
+    } else if(length(act)<3){                                                  # then too few elements
+      out$type   <- 'fout'                                                     # log short message
+      out$action <- 'te weinig elementen'                                      # log long message
     } else if(length(act)>4){                                                  # then too many elements
-      out$type <- 'fout'
-      out$msg  <- 'teveel elementen'
+      out$type   <- 'fout'
+      out$action <- 'teveel elementen'
     } else{                                                                    # then either 3 or 4 elements
       out$type     <- 'succes'                                                 # log that parsing was successful
-      out$msg      <- paste('actie bevat', length(act),'elementen')
+      out$action   <- paste('actie bevat', length(act),'elementen')
       out$player   <- toupper(act[1])                                          # log all elements
       out$unit     <- toupper(gsub('\\d','', act[2]))
       out$quantity <- as.numeric(gsub('\\D','', act[2]))
-      out$y1       <- toupper(gsub('\\d','', act[3]))
-      out$x1       <- toupper(gsub('\\D','', act[3]))
+      out$y1       <- toupper(gsub('\\D','', act[3]))
+      out$x1       <- toupper(gsub('\\d','', act[3]))
       out$path     <- toupper(gsub('\\d','', act[4]))
+      if(is.na(out$quantity)){out$quantity<-'1'}                           # can be valid for special actions; i.e. radar, bomb
     }
   } else {
-    out$type <- 'fout'
-    out$msg  <- 'onbekend formaat'
+    out$type   <- 'fout'
+    out$action <- 'onbekend formaat'
   }
   return(out)
 }
@@ -147,23 +162,25 @@ check_action <- function(tbs,player,unit,quantity,x1,y1,path){
 
   # Perform GENERAL checks
   if(! player %in% pNames){                                                                              # check if player name exists
-    out$msg  <- 'speler bestaat niet'                                                                    # if so, update message
+    out$action  <- 'speler bestaat niet'                                                                 # if so, update message
   } else if(! unit %in% uNames){                                                                         # check if unit type exists, use else-if to create chain of checks
-    out$msg  <- 'unit bestaat niet'                                                                      # if so, update message
+    out$action  <- 'unit bestaat niet'                                                                   # if so, update message
   } else if(!x1 %in% boardDef$xPos | !y1 %in% boardDef$yPos){                                            # etc. etc. etc.
-    out$msg  <- 'startcoördinaat bestaat niet'
+    out$action  <- 'startcoördinaat bestaat niet'
   
   # Check SPECIAL actions
   } else if(is.na(path)){
     if(unitDef$Cost[unitDef$Unit==unit]*as.numeric(quantity) > playerDef$Gold[playerDef$Player==player] ){
-      out$msg  <- 'Onvoldoende geld'
+      out$action  <- 'Onvoldoende geld'
     } else {
       out$type <- 'succes'
-      out$msg  <- paste0("Koop ",quantity,unit,' op ',x1,y1)
+      out$action  <- paste0("Koop ",quantity,unit,' op ',x1,y1)
     }
     
   # Check MOVE actions
-  } else if(!is.na(path)) {
+  } else if(nchar(path) > length(gregexpr('U|R|D|L|N|E|S|W', path)[[1]]) | nchar(path)==0){              # check if nchar(path)>0 & all characters are valid
+    out$action  <- 'onjuiste beweging'
+  } else if(!is.na(path) & unit!='R' & unit!='B') {
     pathSep <- unlist(strsplit(path,NULL))                                                               # separate path into individual components
     destE  <- sum(pathSep %in% c("R","W")) - sum(pathSep %in% c("L","E"))                                # calculate horizontal movement (in squares)
     destN  <- sum(pathSep %in% c("U","N")) - sum(pathSep %in% c("D","S"))                                # calculate vertical movement (in squares)
@@ -171,24 +188,32 @@ check_action <- function(tbs,player,unit,quantity,x1,y1,path){
     y2      <- ifelse(which(y1==yNames)+destN<=0,NA,yNames[which(y1==yNames)+destN])                     # find target y coördinate
     
     if(nrow(tbs[tbs$xPos==x1 & tbs$yPos==y1,])<=0){                                                      # check if ANY units exist on square
-      out$msg  <- 'Je hebt hier geen units'                                            
+      out$action  <- 'Je hebt hier geen units'                                            
     } else if(!tbs$player[tbs$xPos==x1 & tbs$yPos==y1] %in% player){                                     # check if PLAYER has units on square
-      out$msg  <- 'Je hebt hier geen units'
+      out$action  <- 'Je hebt hier geen units'
     } else if(!tbs$unit[tbs$xPos==x1 & tbs$yPos==y1 & tbs$player==player] %in% unit){                    # check if player has TARGET UNIT on square
-      out$msg  <- 'Unit niet op startcoördinaat'
+      out$action  <- 'Unit niet op startcoördinaat'
     } else if(tbs$quantity[tbs$xPos==x1 & tbs$yPos==y1 & tbs$player==player & tbs$unit==unit] < quantity){ # check if player has sufficient QUANTITY of units
-      out$msg  <- 'Onvoldoende units op startcoördinaat'
+      out$action  <- 'Onvoldoende units op startcoördinaat'
     } else if(nchar(path) > unitDef$Speed[unitDef$Unit==unit]){                                          # check if unit can move far enough
-      out$msg  <- 'Verplaatsing te ver'
+      out$action  <- 'Verplaatsing te ver'
     } else if(is.na(x2) | is.na(y2)){                                                                    # check if target coördinate is valid
-      out$msg  <- 'Doelcoördinaat buiten kaart'
+      out$action  <- 'Doelcoördinaat buiten kaart'
     } else {
       out$type <- 'succes'
-      out$msg  <- paste0("Verplaats ",quantity,unit,' naar ',y2,x2)
+      out$action  <- paste0("Verplaats ",quantity,unit,' naar ',y2,x2)
     }
   }
 
   return(out)
+}
+
+parse_and_check <- function(tbs,action){
+  prs <- parse_action(action)
+  if(prs$type=="succes"){
+    prs <- check_action(tbs,prs$player,prs$unit,prs$quantity,prs$x1,prs$y1,prs$path)
+  }
+  return(prs)
 }
 
 #-------------------------------------------#
@@ -286,8 +311,8 @@ create_unit <- function(tbs,player,unit,quantity,x,y){
   tbs                        <- rbind(tbs,tbs[1,])                            # randomly duplicate first row as a placeholder
   tbs[nrow(tbs),'xPos']      <- x                                             # now set all variables to correct values
   tbs[nrow(tbs),'yPos']      <- y
-  tbs[nrow(tbs),'xRes']      <- as.numeric(x)*sprRes[1]-sprRes[1]
-  tbs[nrow(tbs),'yRes']      <- which(LETTERS %in% y) * sprRes[2]-sprRes[2]
+  tbs[nrow(tbs),'xRes']      <- which(x==xNames)*sprRes[1]-sprRes[1]
+  tbs[nrow(tbs),'yRes']      <- which(y==yNames)*sprRes[2]-sprRes[2]
   tbs[nrow(tbs),'unit']      <- unit
   tbs[nrow(tbs),'player']    <- player
   tbs[nrow(tbs),'quantity']  <- as.numeric(quantity)
@@ -319,14 +344,14 @@ buy_unit <- function(tbs,player,unit,quantity,x,y){
 #
 #-------------------------------------------#
 
-battle_engine <- function(tbs, x, y){
+battle_engine <- function(tbs, tland, x, y){
   
   fight <- tbs[tbs$xPos == x & tbs$yPos == y,]                                             # select all units on square
   done  <- F                                                                               # used later on to define the end of the battle
   turn  <- 0                                                                               # used later to check how many turns were taken
   fighters <- NULL                                                                         # convenience variable
-  msg   <- paste0("Uitslag gevecht ",y,x)                                                  # starts an output message
-  
+  msg   <- paste0("Uitslag gevecht ",x,y,': ',paste(sort(unique(fight$player)),collapse=" VS ")) # starts an output message
+
   for(i in 1:nrow(fight)){                                                                 # loop over all units in the fight
     pcurrent <- fight$player[i]                                                            # find current player
     ocurrent <- fight$unit[fight$player != pcurrent]                                       # find possible opponents
@@ -400,11 +425,14 @@ battle_engine <- function(tbs, x, y){
   if(nrow(fight)>=1){                                                                      # if there are any 
     fight$quantity <- fighters$quantity                                                    # update their quantity
   }
+  if(nrow(fight)==0 | length(unique(fight$player))>1){                                     # then either 0 or >1 players
+    tland <- updateMapOwner(tland,x,y)
+  }
 
   tbs <- rbind(tbs[tbs$xPos != x | tbs$yPos != y,],fight)                                  # remove vanquished units from board
   tbs <- simplify_board(tbs)                                                               # make sure to remove potential duplicates (probably unnecessary here)
   
-  return(list(tbs=tbs,msg=msg))
+  return(list(tbs=tbs,tland=tland,msg=msg))
 }
 
 #-------------------------------------------#
@@ -420,12 +448,12 @@ battle_engine <- function(tbs, x, y){
 #
 #-------------------------------------------#
 
-updateMapOwner <- function(land,x,y,player){
+updateMapOwner <- function(land,x,y,player=NULL){
   
   x <- which(x == xNames)
   y <- gridSize[2] - which(y == yNames) + 1
   
-  if(length(player)>1){                                                                    # in case of disputed land, ownership is undecided
+  if(length(player)>1 | is.null(player)){                                                  # in case of disputed land, ownership is undecided
     land[y,x,1:4] <- 0                                                                     # so put everything to 0, including alpha
   } else {
     land[y,x,1] <- playerDef$red[playerDef$Player==player]/255                             # otherwise, assing player color
@@ -457,25 +485,33 @@ game[[paste(turn)]][['land']] <- land
 #-------------------------------------------#
 
 do_action <- function(session,tbs,tland,action){
-  act <- parse_action(action)
+  msg <- parse_action(action)
 
-  msg <- NULL
-  msg$type <- act$type
-  msg$parse <- act$msg
-  
   if(msg$type=="succes"){
-    chk       <- check_action(tbs,act$player,act$unit,act$quantity,act$x1,act$y1,act$path)
-    msg$check <- chk$msg
-    msg$type  <- chk$type
+    chk        <- check_action(tbs,msg$player,msg$unit,msg$quantity,msg$x1,msg$y1,msg$path)
+    msg$action <- chk$action
+    msg$type   <- chk$type
   }
   
-  if(msg$type=="succes"){                                                                   # IF the action is valid (i.e. success)
-    if(is.na(act$path)){
-      tbs    <- buy_unit(tbs,act$player,act$unit,act$quantity,act$x1,act$y1)
-      tland  <- updateMapOwner(tland,act$x1,act$y1,act$player)
-      msg$outcome <- 'unit gekocht'
-    } else {
-      move   <- execute_move(tbs,tland,act$player,act$unit,act$quantity,act$x1,act$y1,act$path) # THEN actually perform the move
+  if(msg$type=="succes"){                                                                       # IF the action is valid (i.e. success)
+    if(is.na(msg$path)){                                                                        # for now, assume a unit needs to be bought
+      
+      if(msg$unit == 'R'){                                                                      # then we want a radar scan
+        msg$outcome <- paste0('radarscan uitgevoerd op ',msg$x1,msg$y1)
+        msg$radar   <- radar_scan(tbs,tland,msg$x1,msg$y1,msg$player)
+      } else if(msg$unit == 'B'){
+        bomb        <- bomb(tbs,tland,msg$x1,msg$y1,msg$player)
+        tbs         <- bomb$tbs
+        tland       <- bomb$tland
+        msg$outcome <- paste0('bombardement uitgevoerd op ',msg$x1,msg$y1)
+        msg$bomb    <- bomb$msg
+      }else {                                                                                   # then assume we want to move stuff
+        tbs    <- buy_unit(tbs,msg$player,msg$unit,msg$quantity,msg$x1,msg$y1)
+        tland  <- updateMapOwner(tland,msg$x1,msg$y1,msg$player)
+        msg$outcome <- paste0(msg$quantity," ",unitDef$Label[unitDef$Unit==msg$unit],"s gekocht op ",msg$y1,msg$x1)
+      }
+    } else {                                                                                    # if path is supplied, action must be a move
+      move   <- execute_move(tbs,tland,msg$player,msg$unit,msg$quantity,msg$x1,msg$y1,msg$path) # THEN actually perform the move
       tbs    <- move$tbs
       tland  <- move$tland
       msg$outcome <- move$msg
@@ -526,40 +562,71 @@ render_board <- function(tbs,tland){
 #
 #---------------------------------------------#
 
-end_turn <- function(session,tbs,tland,output){
-  msg <- ''
+end_turn <- function(session,tbs,tland,input,output){
   
   #-------------------------------------------#
+  # 9.1. CHECK/DO/FREE ACTIONS
+  for(i in playerDef$Player){           # clear up actions list for next turn
+    for(j in 1:3){
+      actions[[paste0(i,j)]] <<- ''
+    }
+  }
+  
+  for(i in 1:nrow(playerDef)){
+    for(j in 1:3){
+      shinyjs::enable(paste0(playerDef$Player[i],"a",j))
+      updateTextInput(session, paste0(playerDef$Player[i],"a",j), value = paste0(playerDef$Player[i],"."))
+      updateActionButton(session,paste0(playerDef$Player[i],"a",j,"submit"),"")
+    }
+  }
+
+  #-------------------------------------------#
   # 9.1. CHECK/EXECUTE BATTLES
+  msgBattle <- ''
   for(x in unique(tbs$xPos)){                                                              # loop over all x coördinates
     for(y in unique(tbs$yPos)){                                                            # loop over all y coördinates
       if(any(tbs$xPos==x & tbs$yPos==y) ){                                                 # check if ANY units occupy the current square
         if(length(unique(tbs$player[tbs$xPos==x & tbs$yPos==y]))>1){                       # check if >1 PLAYER occupies the current square
-          battleOutcome <- battle_engine(tbs,x,y)                                          # if so, trigger battle engine
+          battleOutcome <- battle_engine(tbs,tland,x,y)                                    # if so, trigger battle engine
           tbs <- battleOutcome$tbs
-          msg <- paste(msg,battleOutcome$msg,sep = '<br/>')
+          tland <- battleOutcome$tland
+          msgBattle <- paste(msgBattle,battleOutcome$msg,sep = '<br/>')
         }
       }
     }
   }
-  
+
   #-------------------------------------------#
-  # 9.2. HOUSEKEEPING
+  # 9.2. HOUSEKEEPING A
   tbs$unit[tbs$unit=="E"] <- "P"                                                           # at the end of turn, change paratroopers to platoons
   tbs           <- simplify_board(tbs)                                                     # check board if necessary
-  output$battleResult <- renderUI({HTML(msg)})
+  for(i in 1:nrow(playerDef)){
+    playerDef$Land[i] <<- sum(tland[,,1]  == playerDef$red[i]/255 & tland[,,2]  == playerDef$green[i]/255 & tland[,,3]  == playerDef$blue[i]/255)  
+  }
+  
+  #-------------------------------------------#
+  # 9.2. REPORTING
+  output$battleResult <- renderUI({HTML(msgBattle)})
+  
+  output[[paste0('report',playerDef$Player[1])]] <- renderUI({HTML(generate_report(session,tbs,tland,playerDef$Player[1],input,output,msgBattle))})
+  output[[paste0('report',playerDef$Player[2])]] <- renderUI({HTML(generate_report(session,tbs,tland,playerDef$Player[2],input,output,msgBattle))})
+  output[[paste0('report',playerDef$Player[3])]] <- renderUI({HTML(generate_report(session,tbs,tland,playerDef$Player[3],input,output,msgBattle))})
+  output[[paste0('report',playerDef$Player[4])]] <- renderUI({HTML(generate_report(session,tbs,tland,playerDef$Player[4],input,output,msgBattle))})
+  
+  #-------------------------------------------#
+  # 9.2. HOUSEKEEPING B
   turn           <<- turn + 1                                                              # increase turn counter
   year           <<- yearStart + floor(turn/yearCycle)                                     # increase year if necessary
   playerDef$Gold <<- playerDef$Gold + turnBonus                                            # add turn bonus
   playerDef$Gold <<- playerDef$Gold + ifelse(floor(turn/yearCycle)-floor((turn-1)/yearCycle)==1,yearBonus,0) # in case of new year, add year bonus
-  
+
   update_buttons(session)                                                                  # this will simply overwrite the current value
-  
+
   #-------------------------------------------#
   # 9.3. SAVE RESULTS
-  # save_turn(d)                                                                           # log turn
+  save_turn(session,tbs,tland)                                                                           # log turn
   
-  return(list(tbs=tbs,tland=tland,output=output))
+  return(list(tbs=tbs,tland=tland,output=output,msgBattle=msgBattle))
 }
 
 #-------------------------------------------#
@@ -576,28 +643,31 @@ end_turn <- function(session,tbs,tland,output){
 #
 #-------------------------------------------#
 
-save_turn <- function(d){
-  game[[paste(turn)]][['bs']] <<- d$bs                                                     # store boardstate
-  game[[paste(turn)]][['land']] <<- d$land                                                 # store land ownership
+save_turn <- function(session,tbs,tland,saveFiles=F){
+  game[[paste(turn)]][['bs']] <<- tbs                                                     # store boardstate
+  game[[paste(turn)]][['land']] <<- tland                                                 # store land ownership
+  game[[paste(turn)]][['msglog']] <<- msglog
   
   if(as.numeric(turn) < max(as.numeric(names(game)))){                                     # if a parallel universe is started ...
     game[paste(seq(turn+1,max(as.numeric(names(game)))))] <<- NULL                         # ... destroy the old universe
   }
   
-  saveRDS(game,file.path(wd,'savegame',paste0("Game_",gameID,"_turn_",turn,".rds")))       # save entire game
-  png(file.path(wd,'savegame',paste0("Game_",gameID,"_turn_",turn,'.png')),                # save png of boardState
-      width=gridRes[1],height=gridRes[2])
-  plot.new()
-  render_board(d$bs,d$land)
-  dev.off()
-  
-  if(turn==2){                                                                             # the first turn is not automatically saved, because it is not the result of an end-of-turn event
-    png(file.path(wd,'savegame',paste0("Game_",gameID,"_turn_",turn-1,'.png')),            # save png of boardState
+  if(saveFiles==T){
+    saveRDS(game,file.path(wd,'savegame',paste0("Game_",gameID,"_turn_",turn,".rds")))       # save entire game
+    png(file.path(wd,'savegame',paste0("Game_",gameID,"_turn_",turn,'.png')),                # save png of boardState
         width=gridRes[1],height=gridRes[2])
     plot.new()
-    render_board(game[['1']][['bs']],game[['1']][['land']])
+    render_board(tbs,tland)
     dev.off()
-  }  
+    
+    if(turn==2){                                                                             # the first turn is not automatically saved, because it is not the result of an end-of-turn event
+      png(file.path(wd,'savegame',paste0("Game_",gameID,"_turn_",turn-1,'.png')),            # save png of boardState
+          width=gridRes[1],height=gridRes[2])
+      plot.new()
+      render_board(game[['1']][['bs']],game[['1']][['land']])
+      dev.off()
+    }  
+  }
 }
 
 #-------------------------------------------#
@@ -620,7 +690,7 @@ simplify_board <- function(tbs){
 #-------------------------------------------#
 update_buttons <- function(session){                                                       # function will only work for 1 session at a time
   for(i in 1:nrow(playerDef)){                                                             # for every player ...
-    updateActionButton(session,paste0("p",i,"Score"),label=paste(playerDef$Label[i],playerDef$Gold[i])) # ... update the gold-button
+    updateActionButton(session,paste0(playerDef$Player[i],"Score"),label=paste(playerDef$Label[i],playerDef$Gold[i])) # ... update the gold-button
   }
   updateActionButton(session,"turn",paste("turn",turn))
   updateActionButton(session,"year",paste("year",year))
@@ -634,12 +704,151 @@ pos2res <- function(pos,names){                                                 
   return(res)
 }
 
-lazy_check <- function(tbs,action){
-  prs <- parse_action(action)
-  if(prs$type=="succes"){
-    prs <- check_action(tbs,prs$player,prs$unit,prs$quantity,prs$x1,prs$y1,prs$path)
+#-------------------------------------------#
+# X. GENERATE REPORT
+#-------------------------------------------#
+#
+# This is a key function to provide consolidated
+# reports to players. The idea is to use this
+# function once each turn. The report provides
+# information on action outcomes, results
+# of special actions, units lost in battle etc.
+#
+#-------------------------------------------#
+
+generate_report <- function(session,tbs,tland,player,input,output,msgBattle){
+  
+  l <- '------------------------------------------'
+  b <- '<br/>'
+  
+  bomb <- ''
+  for(p in playerDef$Player){
+    for(j in 1:3){
+      bomb <- paste0(bomb,msglog[[paste0(p,'a',j)]]$bomb)
+    }
   }
-  return(prs)
+  bomb <- ifelse(grepl(playerDef$Label[playerDef$Player==player],bomb),bomb,'')
+  
+  battle <- ifelse(grepl(player,msgBattle),msgBattle,'')
+  
+  radar <- paste0(msglog[[paste0(player,'a1')]]$radar,
+                  msglog[[paste0(player,'a2')]]$radar,
+                  msglog[[paste0(player,'a3')]]$radar)
+
+  rapport <- paste0(l,b,
+                    'Rapport: ',playerDef$Label[playerDef$Player==player],b,
+                    sample(1:30,1),' ',month.abb[floor(turn/yearCycle*12)],' ',year,b)
+  overzicht <- paste0(l,b,
+                      'Overzicht:',b,
+                      'Goud: ',playerDef$Gold[playerDef$Player==player],b,
+                      'Land: ',playerDef$Land[playerDef$Player==player],' (',round(100*playerDef$Land[playerDef$Player==player]/prod(gridSize)),'%)',b)
+  acties <- paste0(l,b,
+                   'Uitslag acties:',b,
+                   "A1: ", msglog[[paste0(player,'a1')]]$type,' ',msglog[[paste0(player,'a1')]]$outcome,b,
+                   "A2: ", msglog[[paste0(player,'a2')]]$type,' ',msglog[[paste0(player,'a2')]]$outcome,b,
+                   "A3: ", msglog[[paste0(player,'a3')]]$type,' ',msglog[[paste0(player,'a3')]]$outcome,b)
+  gevecht <- paste0(l,b,
+                    'Gevechtssituaties:',b,
+                    battle,b,
+                    bomb,b)
+  speciaal <- paste0(l,b,
+                     'Speciale acties:',b,
+                     ifelse(length(radar)==0,'',paste0('Radar Scans',b,radar,b)))
+  einde <- paste0(l,b,
+                  'Einde bericht',b,
+                  l)
+  
+  out <- paste(rapport,overzicht,acties,gevecht,speciaal,einde,sep='')
+  game[[paste(turn)]][[paste0('report',player)]] <<- out
+  
+  return(out)
+  
+}
+
+#-------------------------------------------#
+# X. RADAR SCAN
+#-------------------------------------------#
+#
+# A radar scan does not affect the board.
+# It only generates a message, containing
+# board information around a central square.
+# The radius of the radar scan can be changed
+# in the game settings.
+#
+#-------------------------------------------#
+
+radar_scan <- function(tbs,tland,x,y,player){
+  
+  x1 <- ifelse(which(x==xNames)<=scanRadius, 1, which(x==xNames)-scanRadius)                # find leftmost coördinate                                      
+  x2 <- ifelse(which(x==xNames)+scanRadius>=length(xNames), length(xNames), which(x==xNames)+scanRadius) # find rightmost coördinate 
+  y1 <- ifelse(which(y==yNames)<=scanRadius, 1, which(y==yNames)-scanRadius)                # find highest coördinate
+  y2 <- ifelse(which(y==yNames)+scanRadius>=length(yNames), length(yNames), which(y==yNames)+scanRadius) # find lowest coördinate
+  
+  msg <- ''
+  for(x in x1:x2){                                                                          # loop over horizontal coördinates
+    for(y in y1:y2){                                                                        # loop over vertical coördinates
+      msg <- paste(msg,xNames[x],yNames[y],':',sep='')                                      # log current coördinate
+      if(any(tbs$xPos==xNames[x] & tbs$yPos==yNames[y])){                                   # check if units exist on coördinate
+        hit <- which(tbs$xPos==xNames[x] & tbs$yPos==yNames[y])                             # if so, find indexes ...
+        for(i in hit){                                                                      # ... and loop over them
+          msg <- paste0(msg, tbs$quantity[i],'x',unitDef$Label[unitDef$Unit==tbs$unit[i]],' ',playerDef$Label[playerDef$Player==tbs$player[i]]) # log unit, quantity & player
+        } 
+      } else if(any(tland[gridSize[2]-y+1,x,1:3]!=0)){                                      # else, check if coördinate is owned by player
+        clr <- tland[gridSize[2]-y+1,x,1:3] * 255                                           # log color
+        msg <- paste0(msg,playerDef$Label[playerDef$red==clr[1] & playerDef$green==clr[2] & playerDef$blue==clr[3]]) # log player belonging to color
+      } else {                                                                              # then no relevant information
+        msg <- paste(msg,'X')
+      }
+      msg <- paste0(msg,' // ')                                                             # suffix each coördinate with "//"
+    }
+    msg <- paste0(msg,'<br/>')                                                              # suffix all vertical coördinates with a line break
+  }
+  
+  playerDef$Gold[playerDef$Player==player] <<- playerDef$Gold[playerDef$Player==player] - unitDef$Cost[unitDef$Unit=='R'] # update player score
+  
+  return(msg)
+}
+
+#-------------------------------------------#
+# X. BOMB
+#-------------------------------------------#
+#
+# A bomb is a special action that completely
+# wipes out all units around a central tile.
+# The blast radius can be adjusted in settings.
+#
+# A bombardment also generates a message informing
+# the user and all affected players about the 
+# results, i.e. all players that lost units.
+#
+#-------------------------------------------#
+
+bomb <- function(tbs,tland,xt,yt,player){
+  x1 <- ifelse(which(xt==xNames)<=bombRadius, 1, which(xt==xNames)-bombRadius)                # find leftmost coördinate                                      
+  x2 <- ifelse(which(xt==xNames)+bombRadius>=length(xNames), length(xNames), which(xt==xNames)+bombRadius) # find rightmost coördinate 
+  y1 <- ifelse(which(yt==yNames)<=bombRadius, 1, which(yt==yNames)-bombRadius)                # find highest coördinate
+  y2 <- ifelse(which(yt==yNames)+bombRadius>=length(yNames), length(yNames), which(yt==yNames)+bombRadius) # find lowest coördinate
+  
+  msg <- paste0('Bom van ',playerDef$Label[playerDef$Player==player],'. Verliezen:  <br/>')
+  for(x in x1:x2){
+    for(y in y1:y2){
+      msg <- paste0(msg,xNames[x],yNames[y],': ')
+      if(any(tbs$xPos==xNames[x] & tbs$yPos==yNames[y])){
+        for(i in which(tbs$xPos==xNames[x] & tbs$yPos==yNames[y])){
+          msg <- paste(msg, paste0(tbs$quantity[i],'x',unitDef$Label[unitDef$Unit==tbs$unit[i]],' ',playerDef$Label[playerDef$Player==tbs$player[i]]),sep=',')
+        }
+        tbs <- tbs[!(tbs$xPos==xNames[x] & tbs$yPos==yNames[y]),]                             # actually kill units
+        msg <- sub(",","",msg)                                                                # remove trailing ','
+      } else {
+        msg <- paste0(msg,'X')
+      }
+      tland <- updateMapOwner(tland,xNames[x],yNames[y])                                      # free up map ownership
+      msg <- paste0(msg,'// ')                                                                # suffix all vertical coördinates with a line break
+    }
+    msg <- paste0(msg,'<br/>')                                                                # suffix all vertical coördinates with a line break
+  }
+
+  return(list(tbs=tbs,tland=tland,msg=msg))
 }
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

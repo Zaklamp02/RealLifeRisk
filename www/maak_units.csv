@@ -1,10 +1,11 @@
-Dit bestand bevat alle units in het spel en hun eigenschappen. De meeste eigenschappen spreken voor zich. De laatste kolommen bepalen de *relatieve* aanvalskracht van een unit tegen elke andere unit. Dit kun je lezen als: 1 stuk van unit x kan N stuks van unit y verslaan. Nieuwe units kunnen worden toegevoegd door hiervoor regels toe te voegen. Vervolgens moet er per nieuwe unit ook een kolom worden toegevoegd met de naam van de unit. Hierbij dient van alle units te worden ingevuld wat de relatieve kracht is tegen de nieuwe unit.,,,,,,,,,,,,,,
-Unit,Label,Speed,Cost,KillBonus,Dropable,Sprite,T,P,H,M,S,A,E,R
-T,Tank,3,1200,600,0,spr_Tank,1,4,3,0,10,0,1,0
-P,Platoon,3,300,150,1,spr_Platoon,0.25,1,2,0,3,1,1,0
-H,Humvee,5,700,350,0,spr_Humvee,0.1,0.2,1,0,1,1,1,0
-M,Mine,0,500,250,1,spr_Mine,20,20,20,1,0,1,1,0
-S,Minesweeper,3,500,250,0,spr_Minesweeper,0,1,0,30,1,1,1,0
-A,Antitank,2,200,100,0,spr_Antitank,10,1,10,0,10,1,1,0
-E,Paratrooper,0,600,300,1,spr_Paratrooper,0,0,0,0,0,0,0,0
-R,Radar,0,1000,500,1,spr_Radar,0,0,0,0,0,0,0,0
+"Dit bestand bevat alle units in het spel en hun eigenschappen. De meeste eigenschappen spreken voor zich. De laatste kolommen bepalen de *relatieve* aanvalskracht van een unit tegen elke andere unit. Dit kun je lezen als: 1 stuk van unit x kan N stuks van unit y verslaan. Nieuwe units kunnen worden toegevoegd door hiervoor regels toe te voegen. Vervolgens moet er per nieuwe unit ook een kolom worden toegevoegd met de naam van de unit. Hierbij dient van alle units te worden ingevuld wat de relatieve kracht is tegen de nieuwe unit. BELANGRIJK: Unit names 'R' en 'B' mogen niet gebruikt worden, omdat die staan voor speciale units 'Radar' en 'Bombardement'",,,,,,,,,,,,,,,
+Unit,Label,Speed,Cost,KillBonus,Dropable,Sprite,T,P,H,M,S,A,E,R,B
+T,Tank,3,1200,600,0,spr_Tank,1,4,3,0,10,0,1,0,0
+P,Platoon,3,300,150,1,spr_Platoon,0.25,1,2,0,3,1,1,0,0
+H,Humvee,5,700,350,0,spr_Humvee,0.1,0.2,1,0,1,1,1,0,0
+M,Mine,0,500,250,1,spr_Mine,20,20,20,1,0,1,1,0,0
+S,Minesweeper,3,500,250,0,spr_Minesweeper,0,1,0,30,1,1,1,0,0
+A,Antitank,2,200,100,0,spr_Antitank,10,1,10,0,10,1,1,0,0
+E,Paratrooper,0,600,300,1,spr_Paratrooper,0,0,0,0,0,0,0,0,0
+R,Radar,0,1000,500,1,spr_Radar,0,0,0,0,0,0,0,0,0
+B,Bomb,0,1000,500,1,spr_Bomb,0,0,0,0,0,0,0,0,0

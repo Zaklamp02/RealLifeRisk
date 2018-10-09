@@ -1,7 +1,0 @@
-"UITLEG: Dit bestand bevat alle units. Elke unit heeft een aantal eigenschappen. Daarnaast is van elke unit aangegeven wat zijn aanvalskracht is tegen elke ander unit type. UNITS TOEVOEGEN: als je een nieuwe unit wil toevoegen moet je een regel toevoegen, samen met een nieuwe kolom waarin je van elke unit aangeeft hoe sterk deze is ten opzichte van deze nieuwe unit. De naam van deze nieuwe kolom moet gelijk zijn aan de naam die je bij 'Unit' hebt ingevuld. De naam van de unit die je bij kolom 'Unit'",,,,,,,,,,,
-Unit,Label,Speed,Cost,KillBonus,Dropable,Sprite,T,P,H,M,S
-T,Tank,3,1200,600,0,unit_1,1,4,3,0,10
-P,Platoon,3,300,150,1,unit_2,0.25,1,2,0,3
-H,Humvee,5,700,350,0,unit_4,0.1,0.2,1,0,1
-M,Mine,0,500,250,1,unit_6,20,20,20,1,0
-S,Minesweeper,3,500,250,0,unit_6,0,1,0,30,1
