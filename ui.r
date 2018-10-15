@@ -28,15 +28,12 @@ ui <- dashboardPage(
   # 2. CREATE A SIDEBAR
   #-----------------------------------------#
   dashboardSidebar(
-    collapsed=TRUE,                                                                 # create a sidebar, but auto-hide
-    sidebarMenu(                                                                    # create a menu to navigate between tabs
-      id="sidebar",
-      tags$head(tags$style(".inactiveLink {
-                            pointer-events: none;
-                                          cursor: default;
-                                          }")),
-      menuItem("Player",tabName="Player"),
-      menuItem("Main",tabName="Main"),                                              # create buttons for each tab
+    collapsed=TRUE,                                                                                # create a sidebar, but auto-hide
+    sidebarMenu(                                                                                   # create a menu to navigate between tabs
+      id="sidebar",                
+      tags$head(tags$style(".inactiveLink {pointer-events: none;cursor: default;}")),              # by default, disable sidebar
+      menuItem("Player",tabName="Player"),                                                         # create buttons for each tab
+      menuItem("Main",tabName="Main"),                                                             # order is important!
       menuItem("Settings",tabName="Settings")
     )
   ),
@@ -52,11 +49,17 @@ ui <- dashboardPage(
       # 3.a. CREATE MAIN TAB
       #-------------------------------------#
       tabItem(tabName="Main",                                                                      # main tab containing map, controls, etc.
-              
               #-----------------------------#
               # 3.a.1. GAME BOARD
               column(9,                                                                            # columns can have a width of 1-12, which is relative to the 'box' the column exists in
-                     plotOutput("game_board", click="board_click", height=gridRes[2]+20),          # within the row/column we just defined, create an object that can hold a plot (which will later be created by server.r)
+                     fluidRow(
+                       div(id="container",                                                         # create custom container to hold 2 plots on top of eachother
+                           style="position:relative;",                                             # no idea if this is necessary
+                           div(plotOutput("plot_board", click = NULL), style="position:absolute; top:0; left:0;"), # create plot 1
+                           div(plotOutput("plot_state", click = "board_click"), style="position:absolute; top:0; left:0;") # create plot 2
+                       ), style = paste0("height: ",gridRes[2]+20,"px;")                           # specify window height to help layout
+                     ),
+                     
                      #------------------------------#
                      # 3.a.4 ACTION INPUT CONTROLS
                      fluidRow(
@@ -85,42 +88,35 @@ ui <- dashboardPage(
               # 3.a.2 GAME OVERVIEW
               column(3,                                                                          # note that we are still in the same row, but we are defining a new column (of width=3, which together with the previous one makes exactly 12)
                      fluidRow(
-                       actionButton("backward","<<"),
-                       actionButton("turn",paste('turn',turn)),
-                       actionButton("year",paste('year',year)),
-                       actionButton("forward",">>")
+                       actionButton("btn_endTurn", label = "Einde Beurt", style=paste("background-color:darkgrey"),width="98%"),
+                       actionButton("backward","<<",width="19%"),
+                       actionButton("turn",paste('beurt',turn),width="29%"),
+                       actionButton("year",paste('jaar',year),width="29%"),
+                       actionButton("forward",">>",width="19%")
                      ),
-                     fluidRow(
-                       lapply(1:nrow(playerDef), function(i) {                                   # this will create a 'score button' for each player
-                         column(12/nrow(playerDef), style='padding:0px;',                        # create column of 1/nplayers
-                                actionButton(paste0(playerDef$Player[i],"Score"),label=paste(playerDef$Label[i],playerDef$Gold[i]),style=paste("background-color:",playerDef$Color[i]),width='100%')
-                         )
-                       })
-                     ),
-                     
+
                      #---------------------------#
                      # 3.a.3 MOVE BUTTONS
                      fluidRow(                                                                   # within this column we make a new row; you can repeat this indefinitely
                        column(4),                                                                # now we create a new column that acts just as whitespace
-                       column(4,actionButton("btn_up", label = " up ",width='100%'))             # ... and another column that holds an 'up' button
+                       column(4,actionButton("btn_up", label = "Noord",width='100%'))             # ... and another column that holds an 'up' button
                      ),
                      fluidRow(                                                                   # ... add a bunch more rows, columns and buttons
-                       column(4,actionButton("btn_left", label = "left",width='100%')),
-                       column(4,actionButton("btn_sel", label = "NA-NA",width='100%')),
-                       column(4,actionButton("btn_right", label = "right",width='100%'))
+                       column(4,actionButton("btn_left",  label = "West",  width='100%')),
+                       column(4,actionButton("btn_sel",   label = "NA-NA", width='100%')),
+                       column(4,actionButton("btn_right", label = "Oost",  width='100%'))
                      ),
                      fluidRow(
                        column(4),
-                       column(4,actionButton("btn_down", label = "down",width='100%'))
+                       column(4,actionButton("btn_down", label = "Zuid",width='100%'))
                      ),
-                     fluidRow(
-                       column(4),
-                       column(4,actionButton("btn_endTurn", label = "End Turn", width='100%'))
-                     ),
+
                      fluidRow(
                        do.call(tabBox, c(id='tab',width='100%',height=gridRes[2]+30,lapply(0:nrow(playerDef), function(i) {
                          if(i==0){tabPanel(title="All",uiOutput("battleResult"))} 
-                         else {tabPanel(title=playerDef$Label[i], uiOutput(paste0('report',playerDef$Player[i])))}
+                         else {tabPanel(title=playerDef$Label[i], 
+                                        fluidRow(uiOutput(paste0('report',playerDef$Player[i]))), 
+                                        fluidRow(actionButton(paste0("printReport",playerDef$Player[i]),"Print Report", width="100%")))}
                        })))
                      )
               )
@@ -140,9 +136,9 @@ ui <- dashboardPage(
                  hidden(
                    div(id="pxgameoverviewdiv",
                        box(id="pxgameoverviewbox", width="100%",
-                           actionButton("turnSlave",paste('turn',turn)),
-                           actionButton("yearSlave",paste('year',year)),
-                           actionButton("scoreSlave",paste('score',year))
+                           actionButton("turnSlave",paste('beurt',turn)),
+                           actionButton("yearSlave",paste('jaar',year)),
+                           actionButton("scoreSlave",paste('goud',year))
                        )
                    )
                  )
@@ -184,19 +180,18 @@ ui <- dashboardPage(
         column(4,
                fluidRow(
                  box(title="Game Settings", status = "primary", width="100%",
+                     textInput("ip_address","IP Adres",paste0(ip,":4414")),
                      textInput("turn_bonus","Bonus per turn",turnBonus),
-                     textInput("year_bonus","Bonus per year",yearBonus),
-                     textInput("year_cycle","Turns per year",yearCycle),
-                     textInput("start_year","Start year",year),
-                     textInput("start_turn","Start turn",turn)
+                     textInput("year_bonus","Bonus per jaar",yearBonus),
+                     textInput("year_cycle","Beurten per jaar",yearCycle),
+                     textInput("start_year","Start jaar",year),
+                     textInput("start_turn","Start beurt",turn)
                  ),
                  box(title="Settings", status = "primary", width="100%",
-                     column(6,textInput("scrn_res_x","Screen Resolution (x)",scrnRes[1])),
-                     column(6,textInput("scrn_res_y","Screen Resolution (y)",scrnRes[2])),
-                     column(6,textInput("grd_size_x","Board Size (x)",gridRes[1])),
-                     column(6,textInput("grd_size,y","Board Size (y)",gridRes[2])),
-                     column(6,textInput("spr_size_x","Sprite Size (x)",sprRes[1])),
-                     column(6,textInput("spr_size,y","Sprite Size (y)",sprRes[2]))
+                     column(6,textInput("scrn_res_x","Scherm Resolutie (x)",scrnRes[1])),
+                     column(6,textInput("scrn_res_y","Scherm Resolutie (y)",scrnRes[2])),
+                     column(6,textInput("grd_size_x","Speelbord dim (x)",gridRes[1])),
+                     column(6,textInput("grd_size,y","Speelbord dim (y)",gridRes[2]))
                  )
                )
         ),

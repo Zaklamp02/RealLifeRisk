@@ -17,20 +17,21 @@
 # 0. CREATE A NEW SERVER FUNCTION
 #-------------------------------------------#
 server <- function(input, output, session) {
-  usr <- ifelse(isolate(session$clientData$url_hostname)=="127.0.0.1","master","slave")
-  shinyjs::runjs("document.getElementsByClassName('sidebar-toggle')[0].style.visibility = 'hidden';")     # by default, sidebar navigation is blocked
   
-  if(usr=="master"){                                              # this means local host is viewing (i.e. master)
-    shinyjs::runjs("document.getElementsByClassName('sidebar-toggle')[0].style.visibility = 'visible';")  # if so, enable sidebar navigation
-    updateTabItems(session, "sidebar", selected = "Main")                                                 # if so, make main tab active
-  }
-
+  shinyjs::runjs("document.getElementsByClassName('sidebar-toggle')[0].style.visibility = 'hidden';") # by default, sidebar navigation is blocked
+  
   #-------------------------------------------#
   # 1. DEFINE USER VARIABLES
   #-------------------------------------------#
+  usr <- ifelse(isolate(session$clientData$url_hostname)=="127.0.0.1","master","slave")       # check if client is master (gamehost) or slave (remote player)
   d   <- reactiveValues(bs=boardState,land=land)                                              # reactive values are special, and (should) do downstream cascading if they are updated
   sel <- reactiveValues(row=1)                                                                # i.e. if you update this value, all outputs that use this value get updated too
   t5s <- reactiveTimer(5000)                                                                  # this can be used as a reactive timer of 2seconds
+  
+  if(usr=="master"){                                                                          # this means game host is viewing (i.e. master)
+    shinyjs::runjs("document.getElementsByClassName('sidebar-toggle')[0].style.visibility = 'visible';")  # if so, enable sidebar navigation
+    updateTabItems(session, "sidebar", selected = "Main")                                                 # if so, make main tab active
+  }
   
   #-------------------------------------------#
   # 2.a. OBSERVE: MOVE BUTTONS
@@ -96,13 +97,44 @@ server <- function(input, output, session) {
   lapply(                                                                                                               # start creating observeEvents for player actions
     X = 1:nrow(playerDef),                                                                                              # create one set for each player
     FUN = function(i){
+      #-------------------------------------------#
+      # 2.c.1. monitor non-submitted actions
+      observe({
+        updateActionButton(session,paste0(playerDef$Player[i],'a1submit'),                                              # check if player is writing an action
+                                  label=paste(parse_and_check(d$bs,input[[paste0(playerDef$Player[i],'a1')]])$action))  # if so, evaluate the action and report back on validity
+      })
+      observe({updateActionButton(session,paste0(playerDef$Player[i],'a2submit'),
+                                  label=paste(parse_and_check(d$bs,input[[paste0(playerDef$Player[i],'a2')]])$action))
+      })
+      observe({updateActionButton(session,paste0(playerDef$Player[i],'a3submit'),
+                                  label=paste(parse_and_check(d$bs,input[[paste0(playerDef$Player[i],'a3')]])$action))
+      })
+      #-------------------------------------------#
+      # 2.c.2. observe remote action submissions
+      observe({t5s()                                                                                                    # refresh this part every 5 seconds
+        if(!actions[[paste0(playerDef$Player[i],"1")]]==''){                                                            # check if remote/slave player has updated their action
+          updateTextInput(session,paste0(playerDef$Player[i],"a1"),NULL,actions[[paste0(playerDef$Player[i],"1")]])     # if so, copy it to our own action input field
+        }
+      })
+      observe({t5s()                                                                                                    # refresh this part every 5 seconds
+        if(!actions[[paste0(playerDef$Player[i],"2")]]==''){                                                            # check if remote/slave player has updated their action
+          updateTextInput(session,paste0(playerDef$Player[i],"a2"),NULL,actions[[paste0(playerDef$Player[i],"2")]])     # if so, copy it to our own action input field
+        }
+      })
+      observe({t5s()                                                                                                    # refresh this part every 5 seconds
+        if(!actions[[paste0(playerDef$Player[i],"3")]]==''){                                                            # check if remote/slave player has updated their action
+          updateTextInput(session,paste0(playerDef$Player[i],"a3"),NULL,actions[[paste0(playerDef$Player[i],"3")]])     # if so, copy it to our own action input field
+        }
+      })
+      #-------------------------------------------#
+      # 2.c.3. observe actual action submissions
       observeEvent(input[[paste0(playerDef$Player[i],"a1submit")]], {                                                   # set up listener for action 1
         result <- do_action(session,d$bs,d$land,input[[paste0(playerDef$Player[i],"a1")]])                              # if pressed, execute action
         d$bs <- result$tbs                                                                                              # update boardState
         d$land <- result$tland                                                                                          # update land ownership
         updateActionButton(session,paste0(playerDef$Player[i],"a1submit"),label=paste(result$msg$type,result$msg$action,sep=" , "))   # update action button
         shinyjs::toggleState(paste0(playerDef$Player[i],"a1"))                                                          # lock action button
-        msglog[[paste0(playerDef$Player[i],"a1")]] <<- result$msg                                        # log outcome
+        msglog[[paste0(playerDef$Player[i],"a1")]] <<- result$msg                                                       # log outcome
       })
       observeEvent(input[[paste0(playerDef$Player[i],"a2submit")]], {                                                   # do the same for action 2 ...
         result <- do_action(session,d$bs,d$land,input[[paste0(playerDef$Player[i],"a2")]])
@@ -120,32 +152,10 @@ server <- function(input, output, session) {
         shinyjs::toggleState(paste0(playerDef$Player[i],"a3"))
         msglog[[paste0(playerDef$Player[i],"a3")]] <<- result$msg
       })
-      observe({t5s()                                                                                                    # refresh this part every 5 seconds
-        if(!actions[[paste0(playerDef$Player[i],"1")]]==''){                                                            # check if remote/slave player has updated their action
-          updateTextInput(session,paste0(playerDef$Player[i],"a1"),NULL,actions[[paste0(playerDef$Player[i],"1")]])     # if so, copy it to our own action input field
-        }
-      })
-      observe({t5s()                                                                                                    # refresh this part every 5 seconds
-        if(!actions[[paste0(playerDef$Player[i],"2")]]==''){                                                            # check if remote/slave player has updated their action
-          updateTextInput(session,paste0(playerDef$Player[i],"a2"),NULL,actions[[paste0(playerDef$Player[i],"2")]])     # if so, copy it to our own action input field
-        }
-      })
-      observe({t5s()                                                                                                    # refresh this part every 5 seconds
-        if(!actions[[paste0(playerDef$Player[i],"3")]]==''){                                                            # check if remote/slave player has updated their action
-          updateTextInput(session,paste0(playerDef$Player[i],"a3"),NULL,actions[[paste0(playerDef$Player[i],"3")]])     # if so, copy it to our own action input field
-        }
-      })
-      observe({updateActionButton(session,paste0(playerDef$Player[i],'a1submit'),                                       # check if player is writing an action
-                                  label=paste(parse_and_check(d$bs,input[[paste0(playerDef$Player[i],'a1')]])$action))  # if so, evaluate the action and report back on validity
-      })
-      observe({updateActionButton(session,paste0(playerDef$Player[i],'a2submit'),
-                                  label=paste(parse_and_check(d$bs,input[[paste0(playerDef$Player[i],'a2')]])$action))
-      })
-      observe({updateActionButton(session,paste0(playerDef$Player[i],'a3submit'),
-                                  label=paste(parse_and_check(d$bs,input[[paste0(playerDef$Player[i],'a3')]])$action))
-      })
     }
   )
+  
+  
   
   #-------------------------------------------#
   # 2.d. OBSERVE: END OF TURN
@@ -175,10 +185,14 @@ server <- function(input, output, session) {
   #-------------------------------------------#
   # 3.a RENDER: GAME BOARD
   #-------------------------------------------#
-  output$game_board <- renderPlot({                                                           # this is the actual fun stuff: the game board!
-    render_board(d$bs,d$land)
-  }, height = gridRes[2], width = gridRes[1])                                                 # make sure plot is rendered at same size as plot itself
+  output$plot_board <- renderPlot({                                                           # the gameboard consists of 2 plots, the board itself + the current state
+    render_board(d$bs,d$land)                                                                 # this avoids having to redraw the base board every time the status changes
+  }, height = gridRes[2], width = gridRes[1]) 
   
+  output$plot_state <- renderPlot({                                                           # this will draw the actual game state, i.e. units+land
+    render_state(d$bs,d$land)
+  }, height = gridRes[2], width = gridRes[1], bg = "transparent")                             # make sure the second plot is drawn without a background, so they can overlap
+
   #-------------------------------------------#
   # 3.b. RENDER: BOARD STATE TABLE
   #-------------------------------------------#
@@ -189,15 +203,13 @@ server <- function(input, output, session) {
   #-------------------------------------------#
   # 3.c. RENDER: OTHER
   #-------------------------------------------#
-  output$set_txt1 <- renderText(paste("X resolution",gridSize[1]," Y Resolution",gridSize[2]))
   output$p1Score <- renderUI({actionButton("p1Score",paste(playerDef$Label[1],playerDef$Gold[1]),width="100%",style=paste("background-color:",playerDef$Color[1]))}) # show score Player 1
   output$p2Score <- renderUI({actionButton("p2Score",paste(playerDef$Label[2],playerDef$Gold[2]),width="100%",style=paste("background-color:",playerDef$Color[2]))}) # show score Player 2
   if(nrow(playerDef)>=3){output$p3Score <- renderUI({actionButton("p3Score",paste(playerDef$Label[3],playerDef$Gold[3]),width="100%",style=paste("background-color:",playerDef$Color[3]))})} # show score Player 3 (if exists)
   if(nrow(playerDef)>=4){output$p4Score <- renderUI({actionButton("p4Score",paste(playerDef$Label[4],playerDef$Gold[4]),width="100%",style=paste("background-color:",playerDef$Color[4]))})} # show score Player 4 (if exists)
-  output$testhtml <- renderUI({HTML(paste("test", "str2", sep = '<br/>')) })
-  
+
   #-------------------------------------------#
-  # 4. OBSERVE: STATUS SCREEN
+  # 4. OBSERVE: EXPORTS
   #-------------------------------------------#
   output$saveImg <- downloadHandler(
     filename = paste0("Game_",gameID,"_turn_",turn,'.png'),
@@ -205,27 +217,37 @@ server <- function(input, output, session) {
       png(file,width=gridRes[1],height=gridRes[2])
       plot.new()
       render_board(d$bs,d$land)
+      render_state(d$bs,d$land)
       dev.off()
+    }
+  )
+  
+  lapply(                                                                                                               # start creating observeEvents for player actions
+    X = 1:nrow(playerDef),                                                                                              # create one set for each player
+    FUN = function(i){
+      observeEvent(input[[paste0("printReport",playerDef$Player[i])]],{
+        print_to_printer(gsub("<br/>","\n",game[[paste(turn)]][[paste0('report',playerDef$Player[i])]]),paste("report",playerDef$Player[i],"turn",turn,sep="_"))
+      })
     }
   )
   
   #-------------------------------------------#
   # 5. OBSERVE: REMOVE PLAYER LOGIC
   #-------------------------------------------#
-  px  <- NULL                                                                      # variable to identify remote player
+  px  <- NULL                                                                                 # variable to identify remote player
   observe({                                                                      
-    t5s()                                                                          # every 5 seconds ...
-    if(input$turnSlave < turn & usr=="slave"){                                     # then a new turn has started
+    t5s()                                                                                     # every 5 seconds ...
+    if(input$turnSlave < turn & usr=="slave"){                                                # then a new turn has started
       d$bs <<- game[[paste(turn)]]$bs
       d$land <<- game[[paste(turn)]]$land
     }
-    updateActionButton(session,"turnSlave",paste("turn:",turn))                    # update global variables
+    updateActionButton(session,"turnSlave",paste("turn:",turn))                               # update global variables
     updateActionButton(session,"yearSlave",paste("year:",year))
-    updateActionButton(session,"scoreSlave",paste("score:",px$Gold))
+    updateActionButton(session,"scoreSlave",paste("score:",playerDef$Gold[playerDef$Player==px$Player]))
     output$reportSlave <- renderUI({HTML(game[[paste(turn)]][[paste0('report',px$Player)]])})
   })
 
-  observeEvent(input$pxpwsubmit,{                                                  # user submits password
+  observeEvent(input$pxpwsubmit,{                                                             # user submits password
     if(input$pxpw %in% playerDef$Password){
       px <<- playerDef[input$pxpw == playerDef$Password,]
       updateTextInput(session,"pxpw",value=paste0("Welkom ",px$Label,"!"))
@@ -239,12 +261,12 @@ server <- function(input, output, session) {
       shinyjs::show(id = "pxactioninputdiv")
       shinyjs::show(id = "pxreportdiv")
       shinyjs::hide(id = "pxpw")
-      shinyjs::hide(id="pxpwsubmit")
+      shinyjs::hide(id = "pxpwsubmit")
     }
   })
   
-  lapply(                                                                                                               # start creating observeEvents for player actions
-    X = 1:3,                                                                                                            # create one set for each player
+  lapply(                                                                                      # start creating observeEvents for player actions
+    X = 1:3,                                                                                   # create one set for each player
     FUN = function(i){
       observe({
         updateActionButton(session,paste0('pxa',i,'submit'),label=paste(parse_and_check(d$bs,paste0(px$Player,'.',input[[paste0('pxa',i)]]))$action))
@@ -257,6 +279,13 @@ server <- function(input, output, session) {
       })
     }
   )
+  
+  #-------------------------------------------#
+  # X. EXIT
+  #-------------------------------------------#
+  session$onSessionEnded(function() {
+    stopApp()
+  })
   
 }
 

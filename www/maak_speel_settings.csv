@@ -1,0 +1,13 @@
+Uitleg,,
+Variable,Value,Note
+turn,1,
+year,1945,
+yearStart,1945,
+yearCycle,5,
+turnBonus,500,
+yearBonus,1500,
+mapAlpha,0.3,
+scanRadius,2,
+bombRadius,0,
+scrnResX,1600,
+scrnResY,600,
