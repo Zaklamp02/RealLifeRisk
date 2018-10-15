@@ -14,16 +14,16 @@ Dit is de manier waarop je acties doorgeeft aan de computer. RealLifeRiskR
 interpreteert AIVD commando's, rekent deze door en rapporteert terug. Een
 AIVD bericht bestaat uit vier componenenten:
 
-> wie.wat.waar.waarheen
-> wie: een "Player" uit maak_spelers.csv
-> wat: een "Unit" uit maak_units.csv + de hoeveelheid
-> waar: een valide coördinaat
-> waarheen: een valide route (in N/E/S/W of U/R/D/L)
+> wie.wat.waar.waarheen  
+> wie: een "Player" uit maak_spelers.csv  
+> wat: een "Unit" uit maak_units.csv + de hoeveelheid  
+> waar: een valide coördinaat  
+> waarheen: een valide route (in N/E/S/W of U/R/D/L)  
 
 Voorbeelden: 
-H.T1.A13    = Herten kopen 1 tank op A13.
-S.P4.J1.UUR = Sperwers verplaatsen 4 peletons van J1 omhoog.omhoog.rechts
-V.B.E9      = Vossen voeren bombardement uit op E9
+H.T1.A13    = Herten kopen 1 tank op A13  
+S.P4.J1.UUR = Sperwers verplaatsen 4 peletons van J1 omhoog.omhoog.rechts  
+V.B.E9      = Vossen voeren bombardement uit op E9  
 
 ###############################################################################
 # INSTALLATIE
@@ -33,11 +33,11 @@ RealLifeRiskR maakt gebruik van R, een simpele programmeertaal, en een webbrowse
 Van beide zijn standalone versies beschikbaar, die je gewoon vanaf een USB stick kan draaien. 
 Om RealLifeRisk te spelen moet je een map maken met daarin de volgende bestanden:
 
-> RealLifeRisk/
-> - GoogleChromePortable/
-> - R-Portable/
-> - shiny/
-> - RealLifeRisk.vbs
+> RealLifeRisk/  
+>   GoogleChromePortable/  
+>   R-Portable/  
+>   shiny/  
+>   RealLifeRisk.vbs  
 
 Je start het spel met RealLifeRisk.vbs. De makkelijkste manier om dit te krijgen 
 is om iemand te zoeken die alle bestanden al op een USB stick heeft staan. 

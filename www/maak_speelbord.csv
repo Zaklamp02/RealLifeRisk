@@ -1,7 +1,0 @@
-art,,,,,,,,,,,
-Unit,Label,Speed,Cost,KillBonus,Dropable,Sprite,T,P,H,M,S
-T,Tank,3,1200,600,0,spr_Tank,1,4,3,0,10
-P,Platoon,3,300,150,1,spr_Platoon,0.25,1,2,0,3
-H,Humvee,5,700,350,0,spr_Humvee,0.1,0.2,1,0,1
-M,Mine,0,500,250,1,spr_Mine,20,20,20,1,0
-S,Minesweeper,3,500,250,0,spr_Minesweeper,0,1,0,30,1
