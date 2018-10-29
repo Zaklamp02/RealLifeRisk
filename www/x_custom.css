@@ -1,0 +1,51 @@
+/* ------------------------------------ */
+/* CUSTOM CSS                           */
+/* ------------------------------------ */
+
+/* ----------------- */
+/* HEADER STYLING    */
+/* ----------------- */
+
+.skin-blue .main-header .navbar {background-color: grey;}        
+.skin-blue .main-header .navbar .sidebar-toggle:hover{background-color: darkgrey;}
+.skin-blue .main-header .logo {font-family: "Georgia", Times, "Times New Roman", serif;font-weight: bold;font-size: 24px;}
+.skin-blue .main-header .logo {background-color: grey;}
+.skin-blue .main-header .logo:hover {background-color: darkgrey;}
+
+/* ----------------- */
+/* SIDEBAR STYLING   */
+/* ----------------- */
+
+.skin-blue .main-sidebar {background-color: darkgrey;}
+.skin-blue .main-sidebar .sidebar .sidebar-menu .active a{background-color: grey;}
+.skin-blue .main-sidebar .sidebar .sidebar-menu a{background-color: darkgrey; border-left-color: darkgrey}
+.skin-blue .main-sidebar .sidebar .sidebar-menu a:hover{background-color: lightgrey;}
+.skin-blue .main-sidebar .sidebar .sidebar-menu {margin: 170px 0px 0px 0px;}
+
+/* ----------------- */
+/* MAIN STYLING      */
+/* ----------------- */
+
+.content-wrapper, .right-side {background-color: lightgrey;}               /* background color */
+
+/* ----------------- */
+/* BOX COLOR & FONT  */
+/* ----------------- */
+
+.nav-tabs-custom {background-color:lightgrey;}
+.box-body {background-color:darkgrey;}
+.box-header {background-color:lightgrey;}
+.nav-tabs-custom>.nav-tabs>li.active {border-top-color: darkgrey;}
+.box.box-primary {border-top-color: darkgrey;}
+.form-control{background-color:lightgrey;}
+.nav-tabs-custom>.tab-content{background-color:grey;}
+.nav-tabs-custom>.nav-tabs>li.active>a {background-color:grey;}
+
+/* ----------------- */
+/* CUSTOM IMAGES     */
+/* ----------------- */
+
+.content-wrapper {background-image:url("menu_main.png"); background-size:cover}
+.main-sidebar {background-image:url("menu_sidebar.png"); background-size:cover}
+.btn {color:yellow; background-image:url("menu_button.png"); background-size:cover}
+.skin-blue .main-sidebar .sidebar .sidebar-menu a{color: yellow; background-color: darkgrey; border-left-color: darkgrey;background-image:url("menu_button.png"); background-size:cover}

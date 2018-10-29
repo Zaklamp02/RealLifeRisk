@@ -24,20 +24,31 @@ parse_action <- function(action){
       out$action <- ''
     } else if(length(act)<3){                                                  # then too few elements
       out$type   <- 'fout'                                                     # log short message
-      out$action <- 'te weinig elementen'                                      # log long message
+      out$action <- ''                                                         # log long message
     } else if(length(act)>4){                                                  # then too many elements
       out$type   <- 'fout'
       out$action <- 'teveel elementen'
     } else{                                                                    # then either 3 or 4 elements
-      out$type     <- 'succes'                                                 # log that parsing was successful
-      out$action   <- paste('actie bevat', length(act),'elementen')
-      out$player   <- toupper(act[1])                                          # log all elements
-      out$unit     <- toupper(gsub('\\d','', act[2]))
-      out$quantity <- as.numeric(gsub('\\D','', act[2]))
-      out$y1       <- toupper(gsub('\\D','', act[3]))
-      out$x1       <- toupper(gsub('\\d','', act[3]))
-      out$path     <- toupper(gsub('\\d','', act[4]))
-      if(is.na(out$quantity)){out$quantity<-'1'}                               # can be valid for special actions; i.e. radar, bomb
+      n <- unlist(regmatches(act[2], gregexpr("[[:digit:]]+", act[2])))
+      u <- unlist(regmatches(act[2], gregexpr("[[:alpha:]]+", act[2])))
+      
+      if(length(u) != length(n)){
+        out$action <- 'ongelijk aantal units vs aantallen'
+      } else {
+        out$type     <- 'succes'                                               # log that parsing was successful
+        out$action   <- paste('actie bevat', length(act),'elementen')
+        out$player   <- toupper(act[1])                                        # log all elements
+        out$unit     <- u[1]
+        out$quantity <- as.numeric(n[1])
+        out$y1       <- toupper(gsub('\\D','', act[3]))
+        out$x1       <- toupper(gsub('\\d','', act[3]))
+        out$path     <- toupper(gsub('\\d','', act[4]))
+        if(is.na(out$quantity)){out$quantity<-'1'}                             # can be valid for special actions; i.e. radar, bomb
+        if(length(u)>1){                                                       # then multi-unit
+          out$subunit <- list(u)
+          out$subquantity <- list(n)
+        }
+      }
     }
   } else {
     out$type   <- 'fout'
@@ -56,7 +67,7 @@ parse_action <- function(action){
 #
 #-------------------------------------------#
 
-check_action <- function(tbs,player,unit,quantity,x1,y1,path){
+check_action <- function(tbs,player,unit,quantity,x1,y1,path,subunit=NULL,subquantity=NULL){
   out      <- list()                                                                                     # allocate variable to hold output
   out$type <- 'fout'                                                                                     # assume the worst
   
@@ -65,12 +76,14 @@ check_action <- function(tbs,player,unit,quantity,x1,y1,path){
     out$action  <- 'speler bestaat niet'                                                                 # if so, update message
   } else if(! unit %in% uNames){                                                                         # check if unit type exists, use else-if to create chain of checks
     out$action  <- 'unit bestaat niet'                                                                   # if so, update message
-  } else if(!x1 %in% boardDef$xPos | !y1 %in% boardDef$yPos){                                            # etc. etc. etc.
+  } else if(!x1 %in% xNames | !y1 %in% yNames){                                                          # etc. etc. etc.
     out$action  <- 'startcoördinaat bestaat niet'
     
     # Check SPECIAL actions
   } else if(is.na(path)){
-    if(unitDef$Cost[unitDef$Unit==unit]*as.numeric(quantity) > playerDef$Gold[playerDef$Player==player] ){
+    if(!is.null(subunit)){
+      out$action <- 'aankoop meerder units niet toegestaan'
+    } else if(unitDef$Cost[unitDef$Unit==unit]*as.numeric(quantity) > playerDef$Gold[playerDef$Player==player] ){
       out$action  <- 'Onvoldoende geld'
     } else {
       out$type <- 'succes'
@@ -89,9 +102,9 @@ check_action <- function(tbs,player,unit,quantity,x1,y1,path){
     
     if(nrow(tbs[tbs$xPos==x1 & tbs$yPos==y1,])<=0){                                                      # check if ANY units exist on square
       out$action  <- 'Je hebt hier geen units'                                            
-    } else if(!tbs$player[tbs$xPos==x1 & tbs$yPos==y1] %in% player){                                     # check if PLAYER has units on square
+    } else if(!any(tbs$player[tbs$xPos==x1 & tbs$yPos==y1] %in% player)){                                # check if PLAYER has units on square
       out$action  <- 'Je hebt hier geen units'
-    } else if(!tbs$unit[tbs$xPos==x1 & tbs$yPos==y1 & tbs$player==player] %in% unit){                    # check if player has TARGET UNIT on square
+    } else if(!any(tbs$unit[tbs$xPos==x1 & tbs$yPos==y1 & tbs$player==player] %in% unit)){               # check if player has TARGET UNIT on square
       out$action  <- 'Unit niet op startcoördinaat'
     } else if(tbs$quantity[tbs$xPos==x1 & tbs$yPos==y1 & tbs$player==player & tbs$unit==unit] < quantity){ # check if player has sufficient QUANTITY of units
       out$action  <- 'Onvoldoende units op startcoördinaat'
@@ -105,6 +118,44 @@ check_action <- function(tbs,player,unit,quantity,x1,y1,path){
     }
   }
   
+  return(out)
+}
+
+check_multiple <- function(tbs,player,unit,quantity,x1,y1,path,subunit,subquantity){
+  out      <- list()    
+  curCap   <- 0                               # current capacity to load units in
+  loader   <- NULL
+  loadee   <- NULL
+  subunit  <- unlist(subunit)                # nice to have, cannot hurt
+  subquantity <- unlist(subquantity)
+  
+  # BASIC CHECKS
+  for(i in 1:length(subunit)){
+    out <- check_action(tbs,player,subunit[i],subquantity[i],x1,y1,strsplit(path,'')[[1]][1],NULL,NULL)
+    if(out$type=='fout'){break}
+  }
+  
+  if(out$type == 'succes'){
+
+    # CALCULATE SOME STUFF
+    for(i in 1:length(subunit)){
+      if(unitDef$Capacity[unitDef$Unit==subunit[i]] > 0){             # then assume the subsequent units should be loaded in it
+        curCap <- curCap + unitDef$Capacity[unitDef$Unit==subunit[i]] # increase available capacity     
+        loader <- c(loader,i)
+      } else if(unitDef$Size[unitDef$Unit==subunit[i]] <= curCap){    # then assume we want to load the unit
+        curCap <- curCap - unitDef$Size[unitDef$Unit==subunit[i]]     # decrease available capacity by unit number
+        loadee <- c(loadee,i)                                         # then we load the current unit
+      }
+    }
+    
+    # ADVANCED CHECKS
+    out$loader   <- loader
+    out$loadee   <- loadee
+    out$unit     <- unit
+    out$quantity <- quantity
+    
+    
+  }
   return(out)
 }
 
@@ -268,7 +319,7 @@ battle_engine <- function(tbs, tland, x, y){
     }
     
     if(max(fighters[,-(1:3)])==0){                                                         # check if there are any valid attacks, otherwise break
-      msg <- paste(msg, paste('aanvalskracht uitgeput'), sep = b)                    # report back
+      msg <- paste(msg, paste('aanvalskracht uitgeput'), sep = b)                          # report back
       break
     }
     
@@ -320,6 +371,15 @@ battle_engine <- function(tbs, tland, x, y){
     }
   }
   
+  # use diff figh vs fighters to build message:
+  msg2 <- paste0("Uitslag gevecht ",x,y,': ',paste(sort(relable(unique(fight$player),playerDef[,c('Player','Label')])),collapse=" VS "),b)
+  
+  for(p in unique(fight$player)){
+    lossCurP <- fight[!rownames(fight) %in% rownames(fighters) & fight$player==p,]
+    msg2 <- paste0(msg2, 'Verliezen ',playerDef$Label[playerDef$Player==p],b, paste0(lossCurP$quantity,'x ',relable(lossCurP$unit,unitDef[,c('Unit','Label')]), collapse = s), b)
+   # msg2 <- paste0(msg2, 'Overlevend ',p,b, paste0(fighters$quantity,'x ',relable(fighters$unit,unitDef[,c('Unit','Label')]), collapse = s), b)
+  }
+  
   fight <- fight[rownames(fighters),]                                                      # find surviving units
   
   if(nrow(fight)>=1){                                                                      # if there are any 
@@ -332,7 +392,7 @@ battle_engine <- function(tbs, tland, x, y){
   tbs <- rbind(tbs[tbs$xPos != x | tbs$yPos != y,],fight)                                  # remove vanquished units from board
   tbs <- simplify_board(tbs)                                                               # make sure to remove potential duplicates (probably unnecessary here)
   
-  return(list(tbs=tbs,tland=tland,msg=msg))
+  return(list(tbs=tbs,tland=tland,msg=msg2))
 }
 
 #-------------------------------------------#
@@ -461,9 +521,9 @@ bomb <- function(tbs,tland,xt,yt,player){
         msg <- paste0(msg,'X')
       }
       tland <- updateMapOwner(tland,xNames[x],yNames[y])                                      # free up map ownership
-      msg <- paste0(msg,s)                                                                # suffix all vertical coördinates with a line break
+      msg <- paste0(msg,s)                                                                    # suffix all vertical coördinates with a line break
     }
-    msg <- paste0(msg,b)                                                                # suffix all vertical coördinates with a line break
+    msg <- paste0(msg,b)                                                                      # suffix all vertical coördinates with a line break
   }
   
   return(list(tbs=tbs,tland=tland,msg=msg))

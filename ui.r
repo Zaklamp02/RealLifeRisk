@@ -17,11 +17,20 @@
 # 0. START CREATING A PAGE
 #-------------------------------------------#
 ui <- dashboardPage(
+  skin="black",                                                                                    # nice basic outline for color scheme
+  
   #-----------------------------------------#
   # 1. CREATE A HEADER
   #-----------------------------------------#
   dashboardHeader(                                                                                 # for now; use an empty header
-    titleWidth=0
+    titleWidth=0,                                                                                  # effectively places sidebar toggle at the left
+    tags$li(
+      class = "dropdown",
+      tags$style(".main-header {max-height: 20px}"),                                               # reduce header height
+      tags$style(".main-header .logo {height: 20px;}"),                                            # ... also rescale logo area
+      tags$style(".sidebar-toggle {height: 20px; padding-top: 1px !important;}"),                  # ... also rescale the sidebar toggle
+      tags$style(".navbar {min-height:20px !important}")                                           # ... also rescale navbar area  
+    ) 
   ),
   
   #-----------------------------------------#
@@ -30,10 +39,10 @@ ui <- dashboardPage(
   dashboardSidebar(
     collapsed=TRUE,                                                                                # create a sidebar, but auto-hide
     sidebarMenu(                                                                                   # create a menu to navigate between tabs
-      id="sidebar",                
+      id="sidebar",                                                                                # gives the sidebar an ID (e.g. to hide/show it later)
       tags$head(tags$style(".inactiveLink {pointer-events: none;cursor: default;}")),              # by default, disable sidebar
       menuItem("Player",tabName="Player"),                                                         # create buttons for each tab
-      menuItem("Main",tabName="Main"),                                                             # order is important!
+      menuItem("Main",tabName="Main"),                                                             # ... order is important!
       menuItem("Settings",tabName="Settings")
     )
   ),
@@ -42,13 +51,16 @@ ui <- dashboardPage(
   # 3. CREATE THE MAIN BODY
   #-----------------------------------------#
   dashboardBody(                                                                                   # start building the main body
-    useShinyjs(),
+    useShinyjs(),                                                                                  # this adds a lot of useful javascript options
+    tags$head(tags$link(rel = "stylesheet", type = "text/css", href = "custom.css")),              # this will add all our custom styling options
+    tags$style(type="text/css", ".shiny-html-output { padding-left:20px;} .nav-tabs-custom {margin-bottom: 0px;}"), # this helps with the layout of html text in tabboxes
     tabItems(                                                                                      # separate contents into several tabs
       
       #-------------------------------------#
       # 3.a. CREATE MAIN TAB
       #-------------------------------------#
       tabItem(tabName="Main",                                                                      # main tab containing map, controls, etc.
+              
               #-----------------------------#
               # 3.a.1. GAME BOARD
               column(9,                                                                            # columns can have a width of 1-12, which is relative to the 'box' the column exists in
@@ -58,35 +70,12 @@ ui <- dashboardPage(
                            div(plotOutput("plot_board", click = NULL), style="position:absolute; top:0; left:0;"), # create plot 1
                            div(plotOutput("plot_state", click = "board_click"), style="position:absolute; top:0; left:0;") # create plot 2
                        ), style = paste0("height: ",gridRes[2]+20,"px;")                           # specify window height to help layout
-                     ),
-                     
-                     #------------------------------#
-                     # 3.a.4 ACTION INPUT CONTROLS
-                     fluidRow(
-                       lapply(1:nrow(playerDef), function(i) {
-                         column(12/nrow(playerDef),
-                                box(title = playerDef$Label[i], status = "primary", width="100%",
-                                    fluidRow(
-                                      column(6,textInput(paste0(playerDef$Player[i],"a1"),NULL,paste0(playerDef$Player[i],"."))),
-                                      actionButton(paste0(playerDef$Player[i],"a1submit"),"",icon=icon("cog"))
-                                    ),
-                                    fluidRow(
-                                      column(6,textInput(paste0(playerDef$Player[i],"a2"),NULL,paste0(playerDef$Player[i],"."))),
-                                      actionButton(paste0(playerDef$Player[i],"a2submit"),"",icon=icon("cog"))
-                                    ),
-                                    fluidRow(
-                                      column(6,textInput(paste0(playerDef$Player[i],"a3"),NULL,paste0(playerDef$Player[i],"."))),
-                                      actionButton(paste0(playerDef$Player[i],"a3submit"),"",icon=icon("cog"))
-                                    )
-                                )
-                         )
-                       })
                      )
               ),
               
               #---------------------------#
               # 3.a.2 GAME OVERVIEW
-              column(3,                                                                          # note that we are still in the same row, but we are defining a new column (of width=3, which together with the previous one makes exactly 12)
+              column(3,                                                                            # note that we are still in the same row, but we are defining a new column (of width=3, which together with the previous one makes exactly 12)
                      fluidRow(
                        actionButton("btn_endTurn", label = "Einde Beurt", style=paste("background-color:darkgrey"),width="98%"),
                        actionButton("backward","<<",width="19%"),
@@ -97,11 +86,11 @@ ui <- dashboardPage(
 
                      #---------------------------#
                      # 3.a.3 MOVE BUTTONS
-                     fluidRow(                                                                   # within this column we make a new row; you can repeat this indefinitely
-                       column(4),                                                                # now we create a new column that acts just as whitespace
-                       column(4,actionButton("btn_up", label = "Noord",width='100%'))             # ... and another column that holds an 'up' button
+                     fluidRow(                                                                     # within this column we make a new row; you can repeat this indefinitely
+                       column(4),                                                                  # now we create a new column that acts just as whitespace
+                       column(4,actionButton("btn_up", label = "Noord",width='100%'))              # ... and another column that holds an 'up' button
                      ),
-                     fluidRow(                                                                   # ... add a bunch more rows, columns and buttons
+                     fluidRow(                                                                     # ... add a bunch more rows, columns and buttons
                        column(4,actionButton("btn_left",  label = "West",  width='100%')),
                        column(4,actionButton("btn_sel",   label = "NA-NA", width='100%')),
                        column(4,actionButton("btn_right", label = "Oost",  width='100%'))
@@ -111,12 +100,57 @@ ui <- dashboardPage(
                        column(4,actionButton("btn_down", label = "Zuid",width='100%'))
                      ),
 
+                     #------------------------------#
+                     # 3.a.4 ACTION INPUT CONTROLS
                      fluidRow(
-                       do.call(tabBox, c(id='tab',width='100%',height=gridRes[2]+30,lapply(0:nrow(playerDef), function(i) {
-                         if(i==0){tabPanel(title="All",uiOutput("battleResult"))} 
-                         else {tabPanel(title=playerDef$Label[i], 
-                                        fluidRow(uiOutput(paste0('report',playerDef$Player[i]))), 
-                                        fluidRow(actionButton(paste0("printReport",playerDef$Player[i]),"Print Report", width="100%")))}
+                       do.call(tabBox, c(id='tab2',width='100%',height=220,lapply(0:nrow(playerDef), function(i) {
+                         if(i==0){                                                                 # first create a tab for non-players  
+                           tabPanel(                                                               # create a tabPanel    
+                             title="Leiding",                                                      # give it a name
+                             fluidRow(                                                          
+                               column(6,textInput('hostaction',NULL,"")),                          # create action input field
+                               actionButton("hostactionsubmit","",icon=icon("cog"))                # create action submission button that will also provide feedback on action validity
+                             )
+                           )
+                         } else {                                                                  # now start looping over players (as defined in playerDef)
+                           tabPanel(                                                               # create tabPanel per player
+                             title=playerDef$Label[i],                                             # give tab a name
+                             fluidRow(
+                               column(6,textInput(paste0(playerDef$Player[i],"a1"),NULL,paste0(playerDef$Player[i],"."))), # create action inputs, similar to before
+                               actionButton(paste0(playerDef$Player[i],"a1submit"),"",icon=icon("cog"))                    # create action submission button, similar to before
+                             ),
+                             fluidRow(
+                               column(6,textInput(paste0(playerDef$Player[i],"a2"),NULL,paste0(playerDef$Player[i],"."))), # repeat to create 3 sets of input/submission buttons
+                               actionButton(paste0(playerDef$Player[i],"a2submit"),"",icon=icon("cog"))                    # ... could improve readability?
+                             ),
+                             fluidRow(
+                               column(6,textInput(paste0(playerDef$Player[i],"a3"),NULL,paste0(playerDef$Player[i],"."))),
+                               actionButton(paste0(playerDef$Player[i],"a3submit"),"",icon=icon("cog"))
+                             )
+                           )
+                          }
+                       })))
+                     ),
+                     
+                     #------------------------------#
+                     # 3.a.5 Feedback reports
+                     fluidRow(                                                                     # basically do the same as above, but for feedback reports
+                       do.call(tabBox, c(id='tab',width='100%',height=360,lapply(0:nrow(playerDef), function(i) { # again, loop over players
+                         if(i==0){                                                                 # start with creating a tab for game host
+                           tabPanel(
+                             title="Leiding",                                                      # give it the same names as before
+                             uiOutput("battleResult")                                              # create dynamic UI output
+                           )
+                         } else {
+                           tabPanel(
+                             
+                             title=playerDef$Label[i], 
+                             div(style = 'overflow-y:scroll; height:310px;',
+                                 fluidRow(uiOutput(paste0('report',playerDef$Player[i]))), 
+                                 fluidRow(actionButton(paste0("printReport",playerDef$Player[i]),"Print Report", width="100%"))
+                             )
+                           )
+                         }
                        })))
                      )
               )
@@ -137,8 +171,7 @@ ui <- dashboardPage(
                    div(id="pxgameoverviewdiv",
                        box(id="pxgameoverviewbox", width="100%",
                            actionButton("turnSlave",paste('beurt',turn)),
-                           actionButton("yearSlave",paste('jaar',year)),
-                           actionButton("scoreSlave",paste('goud',year))
+                           actionButton("yearSlave",paste('jaar',year))
                        )
                    )
                  )
@@ -180,7 +213,7 @@ ui <- dashboardPage(
         column(4,
                fluidRow(
                  box(title="Game Settings", status = "primary", width="100%",
-                     textInput("ip_address","IP Adres",paste0(ip,":4414")),
+                     textInput("ip_address","IP Adres","Unknown IP"),
                      textInput("turn_bonus","Bonus per turn",turnBonus),
                      textInput("year_bonus","Bonus per jaar",yearBonus),
                      textInput("year_cycle","Beurten per jaar",yearCycle),
@@ -243,10 +276,25 @@ ui <- dashboardPage(
 #    \||/\/\//\|/     
 #
 # 
-#    tags$head(
-#      tags$style(HTML(".ra2_background_style{
-#                      background-repeat: no-repeat; background-size: cover;
-#                      background-image: url('menu_background.png'); 
-#                      }"))),
-#    class="ra2_background_style",
 
+
+# tags$style(".nav-tabs {
+#            padding-top:0px;
+#            }
+#            
+#            .nav-tabs-custom .nav-tabs li.active:hover a, .nav-tabs-custom .nav-tabs li.active a {
+#            padding-top:0px;
+#            }
+#            
+#            .nav-tabs-custom .nav-tabs li.active {
+#            padding-top:0px;
+#            }
+#            
+#            .nav-tabs-custom>.nav-tabs>li>a:hover {
+#            padding-top:0px;
+#            }  
+#            .nav-tabs-custom>.nav-tabs>li>a {
+#            paddingtop:0px;
+#            }"
+#                
+# ),

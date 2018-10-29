@@ -14,7 +14,7 @@ end_turn <- function(session,tbs,tland,input,output){
   
   #-------------------------------------------#
   # 1.1. CHECK/DO/FREE ACTIONS
-  for(i in playerDef$Player){           # clear up actions list for next turn
+  for(i in playerDef$Player){                                                               # clear up actions list for next turn
     for(j in 1:3){
       actions[[paste0(i,j)]] <<- ''
     }
@@ -64,6 +64,7 @@ end_turn <- function(session,tbs,tland,input,output){
   #-------------------------------------------#
   # 1.5. HOUSEKEEPING B
   turn           <<- turn + 1                                                              # increase turn counter
+  newTurn        <<- TRUE                                                                  # signals remote clients that a new turn has started
   year           <<- yearStart + floor(turn/yearCycle)                                     # increase year if necessary
   playerDef$Gold <<- playerDef$Gold + turnBonus                                            # add turn bonus
   playerDef$Gold <<- playerDef$Gold + ifelse(floor(turn/yearCycle)-floor((turn-1)/yearCycle)==1,yearBonus,0) # in case of new year, add year bonus
@@ -96,21 +97,21 @@ save_turn <- function(session,tbs,tland,saveFiles=F){
   game[[paste(turn)]][['land']] <<- tland                                                 # store land ownership
   game[[paste(turn)]][['msglog']] <<- msglog
   
-  if(as.numeric(turn) < max(as.numeric(names(game)))){                                     # if a parallel universe is started ...
-    game[paste(seq(turn+1,max(as.numeric(names(game)))))] <<- NULL                         # ... destroy the old universe
+  if(as.numeric(turn) < max(as.numeric(names(game)))){                                    # if a parallel universe is started ...
+    game[paste(seq(turn+1,max(as.numeric(names(game)))))] <<- NULL                        # ... destroy the old universe
   }
   
   if(saveFiles==T){
-    saveRDS(game,file.path(wd,'savegame',paste0("Game_",gameID,"_turn_",turn,".rds")))       # save entire game
-    png(file.path(wd,'savegame',paste0("Game_",gameID,"_turn_",turn,'.png')),                # save png of boardState
+    saveRDS(game,file.path(wd,'savegame',paste0("Game_",gameID,"_turn_",turn,".rds")))    # save entire game
+    png(file.path(wd,'savegame',paste0("Game_",gameID,"_turn_",turn,'.png')),             # save png of boardState
         width=gridRes[1],height=gridRes[2])
     plot.new()
     render_board(tbs,tland)
     render_state(tbs,tland)
     dev.off()
     
-    if(turn==2){                                                                             # the first turn is not automatically saved, because it is not the result of an end-of-turn event
-      png(file.path(wd,'savegame',paste0("Game_",gameID,"_turn_",turn-1,'.png')),            # save png of boardState
+    if(turn==2){                                                                          # the first turn is not automatically saved, because it is not the result of an end-of-turn event
+      png(file.path(wd,'savegame',paste0("Game_",gameID,"_turn_",turn-1,'.png')),         # save png of boardState
           width=gridRes[1],height=gridRes[2])
       plot.new()
       render_board(game[['1']][['bs']],game[['1']][['land']])
@@ -131,11 +132,14 @@ save_turn <- function(session,tbs,tland,saveFiles=F){
 #-------------------------------------------#
 
 render_board <- function(tbs,tland){
+  terrain <- parse_terrain(boardDef)
   par(mar=rep(0,4))                                                                        # set figure margins to 0
   plot.window(xlim=c(0,gridRes[1]),ylim=c(0,gridRes[2]))                                   # create a window with correct size
   rasterImage(spr[['board']],0,0,gridRes[1],gridRes[2])                                    # create 'base layer' of game map to start drawing on
-  text(x=boardDef$xRes+sprRes[1]/10, y = gridRes[2]+sprRes[1]/10, labels = boardDef$xPos)  # create coördinate labels along x axis
-  text(x=-sprRes[1]/10, y = boardDef$yRes+sprRes[1]/10, labels = boardDef$yPos)            # create coördinate labels along y axis
+  rasterImage(terrain$terrain,0,0,gridRes[1],gridRes[2],interpolate=F)                     # create layer for cities and water
+  plot(terrain$p,add=T,density=10,col='darkgrey')                                          # add texture to cities and water
+  text(x=seq(0,gridRes[1]-sprRes[1],sprRes[1])+sprRes[1]/5, y = gridRes[2]+sprRes[1]/4, labels = xNames, font=2) # create coördinate labels along x axis
+  text(x=-sprRes[1]/4, y = seq(0,gridRes[2]-sprRes[2],sprRes[2])+sprRes[1]/5, labels = yNames, font=2) # create coördinate labels along y axis
 }
 
 render_state <- function(tbs,tland){
@@ -149,10 +153,10 @@ render_state <- function(tbs,tland){
                 tbs[i,'yRes'],
                 tbs[i,'xRes']+sprRes[1],
                 tbs[i,'yRes']+sprRes[2])
-    text(x=tbs$xRes[i]+sprRes[1]*0.8,y=tbs$yRes[i]+sprRes[2]*0.8,tbs$quantity[i],cex=1.3, font=2)
+    text(x=tbs$xRes[i]+sprRes[1]*0.8,y=tbs$yRes[i]+sprRes[2]*0.8,tbs$quantity[i],cex=1.5, font=2)
   }
-  abline(h=seq(0,gridRes[2],sprRes[2]), col="darkgrey", lwd=4)                             # horizontal lines. Draw these LAST to mask potential sprite-overlaps
-  abline(v=seq(0,gridRes[1],sprRes[1]), col="darkgrey", lwd=4)                             # vertical lines to complete the grid/raster
+  abline(h=seq(0,gridRes[2],sprRes[2]), col="darkgrey", lwd=2)                             # horizontal lines. Draw these LAST to mask potential sprite-overlaps
+  abline(v=seq(0,gridRes[1],sprRes[1]), col="darkgrey", lwd=2)                             # vertical lines to complete the grid/raster
 }
 
 #-------------------------------------------#
@@ -228,3 +232,72 @@ print_to_printer <- function(txt,filename="tmp.txt"){
   system("cmd.exe", input = paste0("notepad /P ", file.path(getwd(),'savegame',filename)),
          show.output.on.console = F, wait = F, minimized = T)   
 }
+
+#-------------------------------------------#
+# 9. PARSE TERRAIN
+#-------------------------------------------#
+#
+# Function used mainly to identify cities
+# and water from a user-specified map. Cities
+# and water have to be specified as C/c or W/w.
+# The function returns the resulting map in
+# two formats; a grid and a raster. The first
+# is used to draw colors, the second to draw
+# textures.
+#
+#-------------------------------------------#
+
+parse_terrain <- function(boardDef){              
+  terrain <- array(rep(0,gridSize[2]*gridSize[1]*4),c(gridSize[2],gridSize[1],4))          # create empty array of size board * 4
+  city    <- data.frame(which(boardDef=="C" | boardDef=="c",arr.ind=T))                    # find row/column locations of cities
+  water   <- data.frame(which(boardDef=="W" | boardDef=="w",arr.ind=T))                    # find row/column locations of water
+  r       <- raster(ncols=gridSize[1],nrows=gridSize[2],xmn=0,xmx=gridRes[1],ymn=0,ymx=gridRes[2]) # create raster of size board
+  
+  for(i in 1:nrow(city)){                                                                  # loop through all city tiles
+    x <- city[i,1]                                                                         # find x coördinate
+    y <- city[i,2]-1                                                                       # find y coördinate
+             
+    terrain[x,y,1] <- col2rgb('orange')[1]/255                                             # set color (rgb[1])
+    terrain[x,y,2] <- col2rgb('orange')[2]/255                                             # set color (rgb[2])
+    terrain[x,y,3] <- col2rgb('orange')[3]/255                                             # set color (rgb[3])
+    terrain[x,y,4] <- 0.5                                                                  # set alpha
+    
+    r[city[i,1],city[i,2]-1] <- 1                                                          # set raster value
+  }
+  
+  for(i in 1:nrow(water)){                                                                 # do the same for water
+    x <- water[i,1]
+    y <- water[i,2]-1
+    
+    terrain[x,y,1] <- col2rgb('blue')[1]/255
+    terrain[x,y,2] <- col2rgb('blue')[2]/255
+    terrain[x,y,3] <- col2rgb('blue')[3]/255
+    terrain[x,y,4] <- 0.5
+    
+    r[water[i,1],water[i,2]-1] <- 1
+  }
+  
+  p <- rasterToPolygons(r, fun=function(x){x==1}, dissolve=TRUE)                           # this will create polygons where raster = 1
+  
+  return(list(p=p,terrain=terrain))
+}
+
+#-------------------------------------------#
+# 10. RELABLE
+#-------------------------------------------#
+# 
+# Useful function to for instance relable 
+# unit abbreviations to full unit names.
+#
+#-------------------------------------------#
+
+relable <- function(v, m){
+  # v = vector of abbreviations
+  # m = nx2 matrix of abbreviations and corresponding lables
+  for(i in 1:nrow(m)){
+    v[v==m[i,1]] <- gsub(m[i,1],m[i,2],v[v==m[i,1]])
+  }
+  return(v)
+}
+
+

@@ -18,7 +18,7 @@ source('ui.R')
 source('server.R')
 
 app <- shinyApp(ui,server)
-shiny::runApp(app,host="0.0.0.0",port=4414)
+shiny::runApp(app,host="0.0.0.0")
 
 ###############################################################################
 #   TO DO
