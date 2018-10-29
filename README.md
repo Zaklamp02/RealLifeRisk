@@ -62,9 +62,9 @@ is om iemand te zoeken die alle bestanden al op een USB stick heeft staan.
 De op één na makkelijkste manier is om zelf een map te maken:
 
 1. Maak een map 'RealLifeRisk/' aan
-2. Download RealLifeRisk.vbs en de 'shiny/' map van [GitHub]{https://github.com/Zaklamp02/RealLifeRisk}
-3. Download [GoogleChromePortable]{https://portableapps.com/apps/internet/google_chrome_portable} en installeer in 'RealLifeRisk/'
-4. Download [R-Portable]{https://sourceforge.net/projects/rportable/} en installeer in 'RealLifeRisk/'
+2. Download RealLifeRisk.vbs en de 'shiny/' map van [GitHub](https://github.com/Zaklamp02/RealLifeRisk)
+3. Download [GoogleChromePortable](https://portableapps.com/apps/internet/google_chrome_portable) en installeer in 'RealLifeRisk/'
+4. Download [R-Portable](https://sourceforge.net/projects/rportable/) en installeer in 'RealLifeRisk/'
 5. Open R-Portable.exe en typ acter elkaar de volgende commando's:
    - install.packages('shiny')
    - install.packages('shinydashboard')
