@@ -43,6 +43,8 @@ De spelleiding houdt het spel continu in de gaten en kan waar nodig bijsturen om
 Het totale spel bestaat uit een serie van beurten. De spelleiding kan van tevoren wincondities bepalen t.a.v.
 landbezit, stedenbezit, score of bestaande units/tegenstanders.
 
+![Board_example](www/base_map.png?raw=true "Title")
+
 ###############################################################################
 # INSTALLATIE
 ###############################################################################
