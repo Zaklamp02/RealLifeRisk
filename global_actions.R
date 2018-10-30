@@ -32,7 +32,8 @@ parse_action <- function(action){
       n <- unlist(regmatches(act[2], gregexpr("[[:digit:]]+", act[2])))
       u <- unlist(regmatches(act[2], gregexpr("[[:alpha:]]+", act[2])))
       
-      if(length(u) != length(n)){
+      if(length(u) != length(n) & length(u) > 1){
+        out$type   <- 'fout'
         out$action <- 'ongelijk aantal units vs aantallen'
       } else {
         out$type     <- 'succes'                                               # log that parsing was successful
@@ -82,7 +83,7 @@ check_action <- function(tbs,player,unit,quantity,x1,y1,path,subunit=NULL,subqua
     # Check SPECIAL actions
   } else if(is.na(path)){
     if(!is.null(subunit)){
-      out$action <- 'aankoop meerder units niet toegestaan'
+      out$action  <- 'koop meerdere units verboden'
     } else if(unitDef$Cost[unitDef$Unit==unit]*as.numeric(quantity) > playerDef$Gold[playerDef$Player==player] ){
       out$action  <- 'Onvoldoende geld'
     } else {
@@ -93,7 +94,7 @@ check_action <- function(tbs,player,unit,quantity,x1,y1,path,subunit=NULL,subqua
     # Check MOVE actions
   } else if(nchar(path) > length(gregexpr('U|R|D|L|N|O|Z|W', path)[[1]]) | nchar(path)==0){              # check if nchar(path)>0 & all characters are valid
     out$action  <- 'onjuiste beweging'
-  } else if(!is.na(path) & unit!='R' & unit!='B') {
+  } else if(!is.na(path) & unit!=unitDef$Unit[1] & unit!=unitDef$Unit[2]) {
     pathSep <- unlist(strsplit(path,NULL))                                                               # separate path into individual components
     destE  <- sum(pathSep %in% c("R","W")) - sum(pathSep %in% c("L","O"))                                # calculate horizontal movement (in squares)
     destN  <- sum(pathSep %in% c("U","N")) - sum(pathSep %in% c("D","Z"))                                # calculate vertical movement (in squares)
@@ -121,48 +122,28 @@ check_action <- function(tbs,player,unit,quantity,x1,y1,path,subunit=NULL,subqua
   return(out)
 }
 
-check_multiple <- function(tbs,player,unit,quantity,x1,y1,path,subunit,subquantity){
-  out      <- list()    
-  curCap   <- 0                               # current capacity to load units in
-  loader   <- NULL
-  loadee   <- NULL
+check_action_all <- function(tbs,player,unit,quantity,x1,y1,path,subunit=NULL,subquantity=NULL){
+  
   subunit  <- unlist(subunit)                # nice to have, cannot hurt
   subquantity <- unlist(subquantity)
   
-  # BASIC CHECKS
-  for(i in 1:length(subunit)){
-    out <- check_action(tbs,player,subunit[i],subquantity[i],x1,y1,strsplit(path,'')[[1]][1],NULL,NULL)
-    if(out$type=='fout'){break}
+  out <- check_action(tbs,player,unit,quantity,x1,y1,path)
+  
+  if(out$type=='succes' & !is.null(subunit)){
+    for(i in 1:length(subunit)){
+      out <- check_action(tbs,player,subunit[i],subquantity[i],x1,y1,path,subunit,subquantity) #strsplit(path,'')[[1]][1],NULL,NULL)
+      if(out$type=='fout'){break}
+    }
+    out$action <- sub(paste0(subquantity[i],subunit[i]),'meerdere',out$action)
   }
   
-  if(out$type == 'succes'){
-
-    # CALCULATE SOME STUFF
-    for(i in 1:length(subunit)){
-      if(unitDef$Capacity[unitDef$Unit==subunit[i]] > 0){             # then assume the subsequent units should be loaded in it
-        curCap <- curCap + unitDef$Capacity[unitDef$Unit==subunit[i]] # increase available capacity     
-        loader <- c(loader,i)
-      } else if(unitDef$Size[unitDef$Unit==subunit[i]] <= curCap){    # then assume we want to load the unit
-        curCap <- curCap - unitDef$Size[unitDef$Unit==subunit[i]]     # decrease available capacity by unit number
-        loadee <- c(loadee,i)                                         # then we load the current unit
-      }
-    }
-    
-    # ADVANCED CHECKS
-    out$loader   <- loader
-    out$loadee   <- loadee
-    out$unit     <- unit
-    out$quantity <- quantity
-    
-    
-  }
   return(out)
 }
 
 parse_and_check <- function(tbs,action){
   prs <- parse_action(action)
   if(prs$type=="succes"){
-    prs <- check_action(tbs,prs$player,prs$unit,prs$quantity,prs$x1,prs$y1,prs$path)
+    prs <- check_action_all(tbs,prs$player,prs$unit,prs$quantity,prs$x1,prs$y1,prs$path,prs$subunit,prs$subquantity)
   }
   return(prs)
 }
@@ -244,6 +225,21 @@ execute_move <- function(tbs,tland,player,unit,quantity,x1,y1,path){
   msg <- paste(msg,tbs$xPos[rowFrom],tbs$yPos[rowFrom])                        # add destination coördinates to output message
   
   return(list(tbs=tbs,tland=tland,msg=msg))
+}
+
+execute_move_all <- function(tbs,tland,player,unit,quantity,x1,y1,path,subunit=NULL,subquantity=NULL){
+  subunit  <- unlist(subunit)                # nice to have, cannot hurt
+  subquantity <- unlist(subquantity)
+  
+  tmp <- execute_move(tbs,tland,player,unit,quantity,x1,y1,path)
+  
+  if(!is.null(subunit)){
+    for(i in 1:length(subunit)){
+      tmp <- execute_move(tmp$tbs,tmp$tland,player,subunit[i],subquantity[i],x1,y1,path)
+    }
+  }
+  
+  return(tmp)
 }
 
 #-------------------------------------------#
@@ -417,16 +413,16 @@ do_action <- function(session,tbs,tland,action){
   if(msg$type=="succes"){                                                                       # IF the action is valid (i.e. success)
     if(is.na(msg$path)){                                                                        # for now, assume a unit needs to be bought
       
-      if(msg$unit == 'R'){                                                                      # then we want a radar scan
+      if(msg$unit == unitDef$Unit[1]){                                                          # then we want a radar scan
         msg$outcome <- paste0('radarscan uitgevoerd op ',msg$x1,msg$y1)
         msg$radar   <- radar_scan(tbs,tland,msg$x1,msg$y1,msg$player)
-      } else if(msg$unit == 'B'){
+      } else if(msg$unit == unitDef$Unit[2]){
         bomb        <- bomb(tbs,tland,msg$x1,msg$y1,msg$player)
         tbs         <- bomb$tbs
         tland       <- bomb$tland
         msg$outcome <- paste0('bombardement uitgevoerd op ',msg$x1,msg$y1)
         msg$bomb    <- bomb$msg
-      }else {                                                                                   # then assume we want to move stuff
+      } else {                                                                                   # then assume we want to move stuff
         tbs    <- buy_unit(tbs,msg$player,msg$unit,msg$quantity,msg$x1,msg$y1)
         tland  <- updateMapOwner(tland,msg$x1,msg$y1,msg$player)
         msg$outcome <- paste0(msg$quantity," ",unitDef$Label[unitDef$Unit==msg$unit],"s gekocht op ",msg$y1,msg$x1)

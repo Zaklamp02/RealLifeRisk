@@ -68,7 +68,8 @@ ui <- dashboardPage(
                        div(id="container",                                                         # create custom container to hold 2 plots on top of eachother
                            style="position:relative;",                                             # no idea if this is necessary
                            div(plotOutput("plot_board", click = NULL), style="position:absolute; top:0; left:0;"), # create plot 1
-                           div(plotOutput("plot_state", click = "board_click"), style="position:absolute; top:0; left:0;") # create plot 2
+                           div(plotOutput("plot_state", click = "board_click", dblclick = "board_dblclick", hover="board_hover"),
+                               uiOutput("board_hover_box"), style="position:absolute; top:0; left:0;") # create plot 2
                        ), style = paste0("height: ",gridRes[2]+20,"px;")                           # specify window height to help layout
                      )
               ),

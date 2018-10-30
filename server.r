@@ -194,15 +194,43 @@ server <- function(input, output, session) {
   #-------------------------------------------#
   # 2.e. OBSERVE: MOUSE CLICKS
   #-------------------------------------------#
-  observe({                                                                                   # tbh: I'm not sure between 'Observe' and 'ObserveEvent'
-    if(is.null(input$board_click$x)) return(NULL)                                             # if nothing was clicked yet, do nothing
+  observeEvent(input$board_click,{
+    output$board_hover_box <- NULL                                                            # this will remove panels created by earlier double-clicks    if(is.null(input$board_click$x)) return(NULL)                                             # if nothing was clicked yet, do nothing
     
     xTmp <- input$board_click$x - input$board_click$x %% sprRes[1]                            # find nearest x coördinate
     yTmp <- input$board_click$y - input$board_click$y %% sprRes[2]                            # find nearest y coördinate
+    nr <- which(d$bs$xRes == xTmp & d$bs$yRes == yTmp)                                        # find rows matching clicked coördinate
 
-    if(any(d$bs$xRes == xTmp & d$bs$yRes == yTmp)) {                                          # check if units exist on location
-      sel$row <- sort(which(d$bs$xRes==xTmp & d$bs$yRes==yTmp),decreasing=T)[1]               # select only the sprite on top (i.e. the unit that you see)
+    if(length(nr)==1) {                                                                       # exactly 1 units exists at location
+      sel$row <- nr                                                                           # select only the sprite on top (i.e. the unit that you see)
       updateActionButton(session,"btn_sel",label=paste(d$bs[sel$row,c('player','unit')],collapse="-")) # if unit is found, update the button-label
+    } else if (length(nr)>1){                                                                 # then multiple units exist
+      nc  <- ifelse(length(nr)<=4,2,ifelse(length(nr)<=9,3,ifelse(length(nr)<=16,4,5)))       # check nr of columns
+      adj <- sprRes / nc                                                                      # calculate sprite size
+      x   <- ceiling((input$board_click$x - xTmp) / adj[1])                                   # check unit closest to click (X)
+      y   <- nc-ceiling((input$board_click$y - yTmp) / adj[2])+1                              # check unit closest to click (Y)
+      sel$row <- nr[y*nc-nc + x]                                                              # combine X and Y and log selected unit
+      updateActionButton(session,"btn_sel",label=paste(d$bs[sel$row,c('player','unit')],collapse="-")) # if unit is found, update the button-label
+    }
+  })
+  
+  observeEvent(input$board_dblclick,{
+    xTmp <- input$board_dblclick$x - input$board_dblclick$x %% sprRes[1]                      # find nearest x coördinate
+    yTmp <- input$board_dblclick$y - input$board_dblclick$y %% sprRes[2]                      # find nearest y coördinate
+    tile <- which(d$bs$xRes==xTmp & d$bs$yRes==yTmp)
+    
+    if(length(tile)>1){
+      output$board_hover_box <- renderUI({
+        loc    <- input$board_dblclick
+        left_pct <- (xTmp + sprRes[1] - loc$domain$left)/(loc$domain$right - loc$domain$left) # find relative position (%) to left of frame
+        top_pct  <- (loc$domain$top - yTmp - sprRes[2])/(loc$domain$top - loc$domain$bottom)  # find relative position (%) to top of frame
+        left_px  <- loc$range$left + left_pct * (loc$range$right - loc$range$left)            # find absolute position (px) to left of frame
+        top_px   <- loc$range$top + top_pct * (loc$range$bottom - loc$range$top)              # find absolute position (px) to top of frame
+        
+        wellPanel(                                                                            # create a wellpanel
+          style = paste0("position:absolute; background-color: rgba(245, 245, 245, 0.85); padding:5px;", "left:", left_px, "px; top:", top_px, "px; "),
+          p(HTML(paste(d$bs[tile,'quantity'],'x',d$bs[tile,'unit'],d$bs[tile,'player'], collapse=b))))
+      })
     }
   })
   

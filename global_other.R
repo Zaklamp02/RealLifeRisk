@@ -148,13 +148,29 @@ render_state <- function(tbs,tland){
   rasterImage(tland,0,0,gridRes[1],gridRes[2],interpolate=F)                               # create 'base layer' of game map to start drawing on
   
   for(i in 1:nrow(tbs)){                                                                   # loop over all units in boardState
-    rasterImage(spr[[paste0(tbs$unit[i],tbs$player[i])]],                                  # cast sprite pointer (char) to variable, and draw
-                tbs[i,'xRes'],                                                             # define correct x1,y1,x2,y2 coördinates (in pixels)
-                tbs[i,'yRes'],
-                tbs[i,'xRes']+sprRes[1],
-                tbs[i,'yRes']+sprRes[2])
-    text(x=tbs$xRes[i]+sprRes[1]*0.8,y=tbs$yRes[i]+sprRes[2]*0.8,tbs$quantity[i],cex=1.5, font=2)
+    hits <- which(tbs[i,'xRes'] == tbs$xRes & tbs[i,'yRes'] == tbs$yRes)
+    
+    if(length(hits)==1){
+      rasterImage(spr[[paste0(tbs$unit[i],tbs$player[i])]],                                # cast sprite pointer (char) to variable, and draw
+                  tbs[i,'xRes'],                                                           # define correct x1,y1,x2,y2 coördinates (in pixels)
+                  tbs[i,'yRes'],
+                  tbs[i,'xRes']+sprRes[1],
+                  tbs[i,'yRes']+sprRes[2])
+      text(x=tbs$xRes[i]+sprRes[1]*0.8,y=tbs$yRes[i]+sprRes[2]*0.8,tbs$quantity[i],cex=1.5, font=2)
+    } else {
+      hitLoc <- which(hits==i)
+      nc <- ifelse(length(hits)<=4,2,ifelse(length(hits)<=9,3,ifelse(length(hits)<=16,4,5)))
+      x  <- hitLoc %% nc
+      y  <- ceiling(hitLoc/nc)
+      sprResAdj <- sprRes / nc
+      rasterImage(spr[[paste0(tbs$unit[i],tbs$player[i])]],                                # cast sprite pointer (char) to variable, and draw
+                  tbs[i,'xRes'] + sprRes[1] - sprResAdj[1]*(x+1),
+                  tbs[i,'yRes'] + sprRes[2] - sprResAdj[2]*(y),
+                  tbs[i,'xRes'] + sprRes[1] - sprResAdj[1]*x,                              # define correct x1,y1,x2,y2 coördinates (in pixels)
+                  tbs[i,'yRes'] + sprRes[2] - sprResAdj[2]*(y-1))
+    }
   }
+    
   abline(h=seq(0,gridRes[2],sprRes[2]), col="darkgrey", lwd=2)                             # horizontal lines. Draw these LAST to mask potential sprite-overlaps
   abline(v=seq(0,gridRes[1],sprRes[1]), col="darkgrey", lwd=2)                             # vertical lines to complete the grid/raster
 }

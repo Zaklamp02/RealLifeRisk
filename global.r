@@ -50,6 +50,10 @@ for(i in 1:nrow(gameDef)){
   assign(gameDef[i,1],gameDef[i,2])
 }
 
+scrnRes  <- system("wmic path Win32_VideoController get CurrentHorizontalResolution,CurrentVerticalResolution",intern=T)
+scrnRes  <- as.numeric(unlist(regmatches(scrnRes, gregexpr("[[:digit:]]+", scrnRes))))
+scrnResX <- ifelse(scrnResX==0,scrnRes[1],scrnResX)
+scrnResY <- ifelse(scrnResY==0,scrnRes[2],scrnResY)
 xNames   <- as.character(names(boardDef)[-1])                                               # names of Y axis
 yNames   <- rev(as.character(boardDef[,1]))                                                 # names of X axis
 uNames   <- unitDef$Unit                                                                    # unit names (abbreviated)
@@ -59,6 +63,7 @@ gridSize <- c(length(xNames),length(yNames))                                    
 sprRes   <- rep(floor(scrnRes[1]*0.73/gridSize[1]),2)                                       # resolution of sprites/units (scaled to match screen resolution)
 gridRes  <- gridSize*sprRes                                                                 # resolution of gameboard
 gameID   <- paste0(LETTERS[sample(1:26,1)],LETTERS[sample(1:26,1)],LETTERS[sample(1:26,1)],sample(111:999,1))
+yearStart<- year
 ip       <- system("ipconfig",intern=T)                                                     # get (server) IP address
 ip       <- ip[grep("IPv4 Address",ip)][1]
 ip       <- ifelse(is.na(ip),"unknown IP address",strsplit(ip," : ")[[1]][2])               # select (server) IP address
