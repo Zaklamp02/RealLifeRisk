@@ -88,7 +88,7 @@ for(i in 1:nrow(playerDef)){
 spr <- list()                                                                              # this will hold all sprites
 spr[['board']] <- readPNG(file.path(wd,'www','base_map.png'),native=F)                     # read gameboard
 for(i in 1:nrow(unitDef)){                                                                 # loop over units
-  sprTmp <- image_read(file.path(wd,'www',paste0(unitDef$Sprite[i],'.jpeg')))              # read sprite for current unit
+  sprTmp <- image_read(file.path(wd,'www',paste0(unitDef$Sprite[i])))                      # read sprite for current unit
   for(j in 1:nrow(playerDef)){                                                             # loop over players
     spr[[paste0(unitDef$Unit[i],playerDef$Player[j])]] <- sprTmp %>%                       # make copy of unit sprite
       image_fill(color=playerDef$Color[j],fuzz=20) %>%                                     # set background of sprite to player color

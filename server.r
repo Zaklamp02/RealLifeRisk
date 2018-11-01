@@ -205,7 +205,7 @@ server <- function(input, output, session) {
       sel$row <- nr                                                                           # select only the sprite on top (i.e. the unit that you see)
       updateActionButton(session,"btn_sel",label=paste(d$bs[sel$row,c('player','unit')],collapse="-")) # if unit is found, update the button-label
     } else if (length(nr)>1){                                                                 # then multiple units exist
-      nc  <- ifelse(length(nr)<=4,2,ifelse(length(nr)<=9,3,ifelse(length(nr)<=16,4,5)))       # check nr of columns
+      nc  <- ceiling(sqrt(length(nr)))                                                        # check nr of columns
       adj <- sprRes / nc                                                                      # calculate sprite size
       x   <- ceiling((input$board_click$x - xTmp) / adj[1])                                   # check unit closest to click (X)
       y   <- nc-ceiling((input$board_click$y - yTmp) / adj[2])+1                              # check unit closest to click (Y)
@@ -219,7 +219,7 @@ server <- function(input, output, session) {
     yTmp <- input$board_dblclick$y - input$board_dblclick$y %% sprRes[2]                      # find nearest y coördinate
     tile <- which(d$bs$xRes==xTmp & d$bs$yRes==yTmp)
     
-    if(length(tile)>1){
+    if(length(tile)>=1){
       output$board_hover_box <- renderUI({
         loc    <- input$board_dblclick
         left_pct <- (xTmp + sprRes[1] - loc$domain$left)/(loc$domain$right - loc$domain$left) # find relative position (%) to left of frame
@@ -229,7 +229,19 @@ server <- function(input, output, session) {
         
         wellPanel(                                                                            # create a wellpanel
           style = paste0("position:absolute; background-color: rgba(245, 245, 245, 0.85); padding:5px;", "left:", left_px, "px; top:", top_px, "px; "),
-          p(HTML(paste(d$bs[tile,'quantity'],'x',d$bs[tile,'unit'],d$bs[tile,'player'], collapse=b))))
+          DT::renderDataTable({
+            hoverdata <- d$bs[tile,c('unit','quantity','player')]
+            hoverdata$unit <- paste0('<img src="',paste0(relable(hoverdata$unit,unitDef[,c('Unit','Sprite')])),'" height="',sprRes[2]/2,'"></img>')
+            DT::datatable(hoverdata,
+                          escape=F,                               # makes sure that images are treated as html (not strings)
+                          rownames = FALSE,                       # hide rownames
+                          colnames = c("", "", ""),               # 'hide' colnames
+                          selection = 'none',                     # prevent row selection
+                          class='compact',                        # reduces whitespace
+                          options=list(dom='t',ordering=F, bSort = FALSE) # removes a lot of the header
+            )
+          })                                                                                  # TXT ONLY: p(HTML(paste(d$bs[tile,'quantity'],'x',d$bs[tile,'unit'],d$bs[tile,'player'], collapse=b)))
+        )
       })
     }
   })

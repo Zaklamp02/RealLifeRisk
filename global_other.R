@@ -159,14 +159,14 @@ render_state <- function(tbs,tland){
       text(x=tbs$xRes[i]+sprRes[1]*0.8,y=tbs$yRes[i]+sprRes[2]*0.8,tbs$quantity[i],cex=1.5, font=2)
     } else {
       hitLoc <- which(hits==i)
-      nc <- ifelse(length(hits)<=4,2,ifelse(length(hits)<=9,3,ifelse(length(hits)<=16,4,5)))
-      x  <- hitLoc %% nc
+      nc <- ceiling(sqrt(length(hits))) 
+      x  <- (hitLoc-1) %% nc + 1
       y  <- ceiling(hitLoc/nc)
       sprResAdj <- sprRes / nc
       rasterImage(spr[[paste0(tbs$unit[i],tbs$player[i])]],                                # cast sprite pointer (char) to variable, and draw
-                  tbs[i,'xRes'] + sprRes[1] - sprResAdj[1]*(x+1),
+                  tbs[i,'xRes'] + sprResAdj[1]*(x-1),
                   tbs[i,'yRes'] + sprRes[2] - sprResAdj[2]*(y),
-                  tbs[i,'xRes'] + sprRes[1] - sprResAdj[1]*x,                              # define correct x1,y1,x2,y2 coördinates (in pixels)
+                  tbs[i,'xRes'] + sprResAdj[1]*x,                                          # define correct x1,y1,x2,y2 coördinates (in pixels)
                   tbs[i,'yRes'] + sprRes[2] - sprResAdj[2]*(y-1))
     }
   }
@@ -269,11 +269,26 @@ parse_terrain <- function(boardDef){
   water   <- data.frame(which(boardDef=="W" | boardDef=="w",arr.ind=T))                    # find row/column locations of water
   r       <- raster(ncols=gridSize[1],nrows=gridSize[2],xmn=0,xmx=gridRes[1],ymn=0,ymx=gridRes[2]) # create raster of size board
   
+  city$city <- seq(1,nrow(city),by=1)
+  
+  for(i in 1:nrow(city)){
+    a <- rep(FALSE,nrow(city))
+    for(j in c(-1,0,1)){                                                   # look up/within/down
+      for(k in c(-1,0,1)){                                                 # look left/within/right
+        a <- a | (city$row[i]+j==city$row & city$col[i]+k==city$col)       # check if current tile is a city (i.e. neighbour)
+      }
+    }
+    city$city[a] <- min(city$city[a],city$city[i])                         # assign lowest common number to all city tiles
+  }
+  for(i in unique(city$city)){
+    city$city[city$city==i] <- which(unique(city$city)==i)
+  }
+  
   for(i in 1:nrow(city)){                                                                  # loop through all city tiles
     x <- city[i,1]                                                                         # find x coördinate
     y <- city[i,2]-1                                                                       # find y coördinate
              
-    terrain[x,y,1] <- col2rgb('orange')[1]/255                                             # set color (rgb[1])
+    terrain[x,y,1] <- col2rgb('orange')[1]/255                                             # set color (rgb[1]) terrain[x,y,1] <- col2rgb(rainbow(max(city$city))[city$city[i]])[1]/255 set color (rgb[1])
     terrain[x,y,2] <- col2rgb('orange')[2]/255                                             # set color (rgb[2])
     terrain[x,y,3] <- col2rgb('orange')[3]/255                                             # set color (rgb[3])
     terrain[x,y,4] <- 0.5                                                                  # set alpha
@@ -295,7 +310,7 @@ parse_terrain <- function(boardDef){
   
   p <- rasterToPolygons(r, fun=function(x){x==1}, dissolve=TRUE)                           # this will create polygons where raster = 1
   
-  return(list(p=p,terrain=terrain))
+  return(list(p=p,terrain=terrain,city=city,water=water))
 }
 
 #-------------------------------------------#

@@ -74,11 +74,11 @@ check_action <- function(tbs,player,unit,quantity,x1,y1,path,subunit=NULL,subqua
   
   # Perform GENERAL checks
   if(! player %in% pNames){                                                                              # check if player name exists
-    out$action  <- 'speler bestaat niet'                                                                 # if so, update message
+    out$action  <- paste(player,'bestaat niet')                                                        # if so, update message
   } else if(! unit %in% uNames){                                                                         # check if unit type exists, use else-if to create chain of checks
-    out$action  <- 'unit bestaat niet'                                                                   # if so, update message
+    out$action  <- paste(unit,'bestaat niet')                                                          # if so, update message
   } else if(!x1 %in% xNames | !y1 %in% yNames){                                                          # etc. etc. etc.
-    out$action  <- 'startcoördinaat bestaat niet'
+    out$action  <- paste0(x1,y1,' bestaat niet')
     
     # Check SPECIAL actions
   } else if(is.na(path)){
@@ -102,13 +102,13 @@ check_action <- function(tbs,player,unit,quantity,x1,y1,path,subunit=NULL,subqua
     y2      <- ifelse(which(y1==yNames)+destN<=0,NA,yNames[which(y1==yNames)+destN])                     # find target y coördinate
     
     if(nrow(tbs[tbs$xPos==x1 & tbs$yPos==y1,])<=0){                                                      # check if ANY units exist on square
-      out$action  <- 'Je hebt hier geen units'                                            
+      out$action  <- paste0('Je hebt hier geen units')                                            
     } else if(!any(tbs$player[tbs$xPos==x1 & tbs$yPos==y1] %in% player)){                                # check if PLAYER has units on square
       out$action  <- 'Je hebt hier geen units'
     } else if(!any(tbs$unit[tbs$xPos==x1 & tbs$yPos==y1 & tbs$player==player] %in% unit)){               # check if player has TARGET UNIT on square
-      out$action  <- 'Unit niet op startcoördinaat'
+      out$action  <- paste(unit,'niet op startcoördinaat')
     } else if(tbs$quantity[tbs$xPos==x1 & tbs$yPos==y1 & tbs$player==player & tbs$unit==unit] < quantity){ # check if player has sufficient QUANTITY of units
-      out$action  <- 'Onvoldoende units op startcoördinaat'
+      out$action  <- paste0('Onvoldoende ',unit,' op ',x1,y1)
     } else if(nchar(path) > unitDef$Speed[unitDef$Unit==unit]){                                          # check if unit can move far enough
       out$action  <- 'Verplaatsing te ver'
     } else if(is.na(x2) | is.na(y2)){                                                                    # check if target coördinate is valid
@@ -388,7 +388,7 @@ battle_engine <- function(tbs, tland, x, y){
   tbs <- rbind(tbs[tbs$xPos != x | tbs$yPos != y,],fight)                                  # remove vanquished units from board
   tbs <- simplify_board(tbs)                                                               # make sure to remove potential duplicates (probably unnecessary here)
   
-  return(list(tbs=tbs,tland=tland,msg=msg2))
+  return(list(tbs=tbs,tland=tland,msg=msg2,msgOld=msg))
 }
 
 #-------------------------------------------#
