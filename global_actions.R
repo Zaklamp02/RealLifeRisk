@@ -39,7 +39,7 @@ parse_action <- function(action){
         out$type     <- 'succes'                                               # log that parsing was successful
         out$action   <- paste('actie bevat', length(act),'elementen')
         out$player   <- toupper(act[1])                                        # log all elements
-        out$unit     <- u[1]
+        out$unit     <- toupper(u[1])
         out$quantity <- as.numeric(n[1])
         out$y1       <- toupper(gsub('\\D','', act[3]))
         out$x1       <- toupper(gsub('\\d','', act[3]))
@@ -74,11 +74,13 @@ check_action <- function(tbs,player,unit,quantity,x1,y1,path,subunit=NULL,subqua
   
   # Perform GENERAL checks
   if(! player %in% pNames){                                                                              # check if player name exists
-    out$action  <- paste(player,'bestaat niet')                                                        # if so, update message
+    out$action  <- paste(player,'bestaat niet')                                                          # if so, update message
   } else if(! unit %in% uNames){                                                                         # check if unit type exists, use else-if to create chain of checks
-    out$action  <- paste(unit,'bestaat niet')                                                          # if so, update message
+    out$action  <- paste(unit,'bestaat niet')                                                            # if so, update message
   } else if(!x1 %in% xNames | !y1 %in% yNames){                                                          # etc. etc. etc.
     out$action  <- paste0(x1,y1,' bestaat niet')
+  } else if(!is.null(quantity) & quantity<1){
+    out$action  <- "hoeveelheid kleiner dan 1"
     
     # Check SPECIAL actions
   } else if(is.na(path)){
@@ -255,15 +257,17 @@ execute_move_all <- function(tbs,tland,player,unit,quantity,x1,y1,path,subunit=N
 #-------------------------------------------#
 
 create_unit <- function(tbs,player,unit,quantity,x,y){
-  tbs                        <- rbind(tbs,tbs[1,])                            # randomly duplicate first row as a placeholder
-  tbs[nrow(tbs),'xPos']      <- x                                             # now set all variables to correct values
-  tbs[nrow(tbs),'yPos']      <- y
-  tbs[nrow(tbs),'xRes']      <- which(x==xNames)*sprRes[1]-sprRes[1]
-  tbs[nrow(tbs),'yRes']      <- which(y==yNames)*sprRes[2]-sprRes[2]
-  tbs[nrow(tbs),'unit']      <- unit
-  tbs[nrow(tbs),'player']    <- player
-  tbs[nrow(tbs),'quantity']  <- as.numeric(quantity)
-  tbs                        <- simplify_board(tbs)
+  if(quantity>0){                                                               # only create units if quantiy > 0
+    tbs                        <- rbind(tbs,tbs[1,])                            # randomly duplicate first row as a placeholder
+    tbs[nrow(tbs),'xPos']      <- x                                             # now set all variables to correct values
+    tbs[nrow(tbs),'yPos']      <- y
+    tbs[nrow(tbs),'xRes']      <- which(x==xNames)*sprRes[1]-sprRes[1]
+    tbs[nrow(tbs),'yRes']      <- which(y==yNames)*sprRes[2]-sprRes[2]
+    tbs[nrow(tbs),'unit']      <- unit
+    tbs[nrow(tbs),'player']    <- player
+    tbs[nrow(tbs),'quantity']  <- as.numeric(quantity)
+    tbs                        <- simplify_board(tbs)
+  }
   
   return(tbs)
 }
@@ -294,6 +298,7 @@ buy_unit <- function(tbs,player,unit,quantity,x,y){
 battle_engine <- function(tbs, tland, x, y){
   
   fight <- tbs[tbs$xPos == x & tbs$yPos == y,]                                             # select all units on square
+  fight <- fight[fight$quantity>0,]
   done  <- F                                                                               # used later on to define the end of the battle
   turn  <- 0                                                                               # used later to check how many turns were taken
   fighters <- NULL                                                                         # convenience variable
@@ -339,8 +344,8 @@ battle_engine <- function(tbs, tland, x, y){
     msg <- paste(msg,paste(qattack,uattack,'van',pattack,'vs',qdefend,udefend,'van',pdefend), sep = b)
     
     # now actually start evaluating the fight
-    ldefend <- min(fighters$quantity[rdefend],floor(sattack*qattack))                      # calculate losses for defender
-    lattack <- min(fighters$quantity[rattack],floor(sdefend*qdefend))                      # calculate losses for attacker
+    ldefend <- min(fighters$quantity[rdefend],floor(sattack))                              # calculate losses for defender
+    lattack <- min(fighters$quantity[rattack],floor(sdefend))                              # calculate losses for attacker
     
     fighters$quantity[rdefend] <- fighters$quantity[rdefend] - ldefend                     # apply losses or defender
     fighters$quantity[rattack] <- fighters$quantity[rattack] - lattack                     # apply losses for attacker
@@ -356,24 +361,34 @@ battle_engine <- function(tbs, tland, x, y){
     
     fighters <- fighters[fighters$quantity>0,]                                             # remove dead units
     
-    if(nrow(fighters)==0){                                                                 # then no players left
+    if(turn>50){
+      done=T                                                                               # force a break if there is no winner after 50 turns
+    } else if(nrow(fighters)==0){                                                          # then no players left
       done=T
     } else if(length(unique(fighters$player[fighters$quantity>0]))==1){                    # then only 1 player left
       done=T
-    } else if(all(fighters[,-c(1:3)]==0)){                                                 # then 2+ players left, but all units have 0 attacking power vs eachother
-      done=T                                                                               # maybe then you want to reset attacking power?
-    } else if(turn>50){
-      done=T                                                                               # force a break if there is no winner after 50 turns
+    } else if(min(fighters$quantity * fighters[,-c(1:3)])<1){                              # then 2+ players left, but all units have 0 attacking power vs eachother
+      for(i in 1:nrow(fighters)){                                                          # start by checking/cleaning
+        pcurrent <- fighters$player[i]                                                     # find current player
+        ocurrent <- fighters$unit[fighters$player != pcurrent]                             # find possible opponents
+        ucurrent <- unitDef[unitDef$Unit==fighters$unit[i],unitDef$Unit] * fighters$quantity[i] # refresh attack powers
+        fighters[i,] <- cbind(fighters[i,c('player','unit','quantity')],ucurrent)
+        fighters[i,!names(fighters) %in% c('player','unit','quantity',ocurrent)] <- 0      # set attack-power vs non-existing oponents to 0
+      }
     }
   }
   
   # use diff figh vs fighters to build message:
   msg2 <- paste0("Uitslag gevecht ",x,y,': ',paste(sort(relable(unique(fight$player),playerDef[,c('Player','Label')])),collapse=" VS "),b)
   
-  for(p in unique(fight$player)){
-    lossCurP <- fight[!rownames(fight) %in% rownames(fighters) & fight$player==p,]
-    msg2 <- paste0(msg2, 'Verliezen ',playerDef$Label[playerDef$Player==p],b, paste0(lossCurP$quantity,'x ',relable(lossCurP$unit,unitDef[,c('Unit','Label')]), collapse = s), b)
-   # msg2 <- paste0(msg2, 'Overlevend ',p,b, paste0(fighters$quantity,'x ',relable(fighters$unit,unitDef[,c('Unit','Label')]), collapse = s), b)
+  for(p in unique(fight$player)){                                                          # find how many units were lost
+    lossFull <- fight[!rownames(fight) %in% rownames(fighters) & fight$player==p,]         # units that are completely dead
+    lossPart <- fight[rownames(fight) %in% rownames(fighters) & fight$player==p,]          # units that decreased in quantity
+    lossPart$quantity <- lossPart$quantity - fighters$quantity[fighters$player==p]         # find difference in quantity
+    lossPart <- lossPart[lossPart$quantity >= 1,]                                          # and ignore units that have no difference in quantity
+    loss     <- rbind(lossFull, lossPart )
+    
+    msg2 <- paste0(msg2, '- Verliezen ',playerDef$Label[playerDef$Player==p],': ', paste0(loss$quantity,'x ',relable(loss$unit,unitDef[,c('Unit','Label')]), collapse = s), b)
   }
   
   fight <- fight[rownames(fighters),]                                                      # find surviving units
@@ -461,11 +476,11 @@ radar_scan <- function(tbs,tland,x,y,player){
   msg <- ''
   for(x in x1:x2){                                                                          # loop over horizontal coördinates
     for(y in y1:y2){                                                                        # loop over vertical coördinates
-      msg <- paste(msg,xNames[x],yNames[y],':',sep='')                                      # log current coördinate
+      msg <- paste(msg,xNames[x],yNames[y],': ',sep='')                                     # log current coördinate
       if(any(tbs$xPos==xNames[x] & tbs$yPos==yNames[y])){                                   # check if units exist on coördinate
         hit <- which(tbs$xPos==xNames[x] & tbs$yPos==yNames[y])                             # if so, find indexes ...
         for(i in hit){                                                                      # ... and loop over them
-          msg <- paste0(msg, tbs$quantity[i],'x',unitDef$Label[unitDef$Unit==tbs$unit[i]],' ',playerDef$Label[playerDef$Player==tbs$player[i]]) # log unit, quantity & player
+          msg <- paste0(msg, tbs$quantity[i],'x ',tbs$unit[i],' ',playerDef$Label[playerDef$Player==tbs$player[i]]) # log unit, quantity & player
         } 
       } else if(any(tland[gridSize[2]-y+1,x,1:3]!=0)){                                      # else, check if coördinate is owned by player
         clr <- tland[gridSize[2]-y+1,x,1:3] * 255                                           # log color
@@ -475,10 +490,9 @@ radar_scan <- function(tbs,tland,x,y,player){
       }
       msg <- paste0(msg,s)                                                                  # suffix each coördinate with "//"
     }
-    msg <- paste0(msg,b)                                                                    # suffix all vertical coördinates with a line break
   }
   
-  playerDef$Gold[playerDef$Player==player] <<- playerDef$Gold[playerDef$Player==player] - unitDef$Cost[unitDef$Unit=='R'] # update player score
+  playerDef$Gold[playerDef$Player==player] <<- playerDef$Gold[playerDef$Player==player] - unitDef$Cost[unitDef$Unit==unitDef$Unit[1]] # update player score
   
   return(msg)
 }
@@ -509,7 +523,7 @@ bomb <- function(tbs,tland,xt,yt,player){
       msg <- paste0(msg,xNames[x],yNames[y],': ')
       if(any(tbs$xPos==xNames[x] & tbs$yPos==yNames[y])){
         for(i in which(tbs$xPos==xNames[x] & tbs$yPos==yNames[y])){
-          msg <- paste(msg, paste0(tbs$quantity[i],'x',unitDef$Label[unitDef$Unit==tbs$unit[i]],' ',playerDef$Label[playerDef$Player==tbs$player[i]]),sep=',')
+          msg <- paste(msg, paste0(tbs$quantity[i],'x ',tbs$unit[i],' ',playerDef$Label[playerDef$Player==tbs$player[i]]),sep=',')
         }
         tbs <- tbs[!(tbs$xPos==xNames[x] & tbs$yPos==yNames[y]),]                             # actually kill units
         msg <- sub(",","",msg)                                                                # remove trailing ','
@@ -519,8 +533,21 @@ bomb <- function(tbs,tland,xt,yt,player){
       tland <- updateMapOwner(tland,xNames[x],yNames[y])                                      # free up map ownership
       msg <- paste0(msg,s)                                                                    # suffix all vertical coördinates with a line break
     }
-    msg <- paste0(msg,b)                                                                      # suffix all vertical coördinates with a line break
   }
+  
+  playerDef$Gold[playerDef$Player==player] <<- playerDef$Gold[playerDef$Player==player] - unitDef$Cost[unitDef$Unit==unitDef$Unit[2]] # update player score
   
   return(list(tbs=tbs,tland=tland,msg=msg))
 }
+
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# X. ARCHIVE
+#   
+#        _____
+#      //  +  \     this is where code
+#     ||  RIP  |      goes to die
+#     ||       |      
+#     ||       |      
+#    \||/\/\//\|/     
+#
+# 

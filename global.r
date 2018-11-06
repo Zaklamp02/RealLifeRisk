@@ -67,7 +67,7 @@ yearStart<- year
 ip       <- system("ipconfig",intern=T)                                                     # get (server) IP address
 ip       <- ip[grep("IPv4 Address",ip)][1]
 ip       <- ifelse(is.na(ip),"unknown IP address",strsplit(ip," : ")[[1]][2])               # select (server) IP address
-l        <- '------------------------------------------'                                    # used to separate report elements
+l        <- paste(rep('-',maxReportWidth*1.4),collapse="")                                  # used to separate report elements (*1.5 as '-' is a bit smaller than usual characters)
 s        <- " // "                                                                          # used to divide information elements
 b        <- '<br/>'                                                                         # used as line break (html)
 newTurn  <- FALSE                                                                           # check if new turn has started
@@ -78,7 +78,7 @@ land       <- array(rep(0,gridSize[2]*gridSize[1]*4),c(gridSize[2],gridSize[1],4
 for(i in 1:nrow(playerDef)){
   loc <- which(boardDef==paste0("P",i),arr.ind=T)
   for(j in 1:nrow(unitDef)){
-    pos        <- ifelse(j<nrow(loc),j,nrow(loc))
+    pos        <- (j-1) %% nrow(loc)+1
     boardState <- create_unit(boardState,playerDef$Player[i],unitDef$Unit[j],unitDef$StartQuantity[j],xNames[loc[pos,2]],yNames[gridSize[2]-loc[pos,1]+1])
     land       <- updateMapOwner(land,xNames[loc[pos,2]],yNames[gridSize[2]-loc[pos,1]+1],playerDef$Player[i])
   }

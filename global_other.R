@@ -328,7 +328,18 @@ relable <- function(v, m){
   for(i in 1:nrow(m)){
     v[v==m[i,1]] <- gsub(m[i,1],m[i,2],v[v==m[i,1]])
   }
+  
   return(v)
 }
 
-
+# %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+# X. ARCHIVE
+#   
+#        _____
+#      //  +  \     this is where code
+#     ||  RIP  |      goes to die
+#     ||       |      
+#     ||       |      
+#    \||/\/\//\|/     
+#
+# 

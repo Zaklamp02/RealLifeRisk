@@ -54,6 +54,9 @@ ui <- dashboardPage(
     useShinyjs(),                                                                                  # this adds a lot of useful javascript options
     tags$head(tags$link(rel = "stylesheet", type = "text/css", href = "custom.css")),              # this will add all our custom styling options
     tags$style(type="text/css", ".shiny-html-output { padding-left:20px;} .nav-tabs-custom {margin-bottom: 0px;}"), # this helps with the layout of html text in tabboxes
+    tags$head(tags$style(
+      HTML('.wrapper {height: auto !important; position:relative; overflow-x:hidden; overflow-y:hidden}')
+    )),
     tabItems(                                                                                      # separate contents into several tabs
       
       #-------------------------------------#
@@ -107,7 +110,7 @@ ui <- dashboardPage(
                        do.call(tabBox, c(id='tab2',width='100%',height=220,lapply(0:nrow(playerDef), function(i) {
                          if(i==0){                                                                 # first create a tab for non-players  
                            tabPanel(                                                               # create a tabPanel    
-                             title="Leiding",                                                      # give it a name
+                             title="X",                                                            # give it a name
                              fluidRow(                                                          
                                column(6,textInput('hostaction',NULL,"")),                          # create action input field
                                actionButton("hostactionsubmit","",icon=icon("cog"))                # create action submission button that will also provide feedback on action validity
@@ -139,14 +142,14 @@ ui <- dashboardPage(
                        do.call(tabBox, c(id='tab',width='100%',height=360,lapply(0:nrow(playerDef), function(i) { # again, loop over players
                          if(i==0){                                                                 # start with creating a tab for game host
                            tabPanel(
-                             title="Leiding",                                                      # give it the same names as before
-                             uiOutput("battleResult")                                              # create dynamic UI output
+                             title="X",                                                            # give it the same names as before
+                             uiOutput("battleResult"),                                              # create dynamic UI output
+                             fluidRow(actionButton("printReportAll","Print All Reports", width="100%"))
                            )
                          } else {
                            tabPanel(
-                             
                              title=playerDef$Label[i], 
-                             div(style = 'overflow-y:scroll; height:310px;',
+                             div(style = 'overflow-y:scroll; overflow-x: hidden; height:310px;',
                                  fluidRow(uiOutput(paste0('report',playerDef$Player[i]))), 
                                  fluidRow(actionButton(paste0("printReport",playerDef$Player[i]),"Print Report", width="100%"))
                              )
