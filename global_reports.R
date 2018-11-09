@@ -10,7 +10,7 @@
 #
 #-------------------------------------------#
 
-generate_report <- function(session,tbs,tland,player,input,output,msgBattle){
+generate_report <- function(session,tbs,tland,player,input,output,msgBattle=''){
   
   bomb <- ''
   for(p in playerDef$Player){
@@ -25,10 +25,13 @@ generate_report <- function(session,tbs,tland,player,input,output,msgBattle){
   a2 <- ifelse(msglog[[paste0(player,'a2')]]$type == "succes",msglog[[paste0(player,'a2')]]$outcome,msglog[[paste0(player,'a2')]]$type)
   a3 <- ifelse(msglog[[paste0(player,'a3')]]$type == "succes",msglog[[paste0(player,'a3')]]$outcome,msglog[[paste0(player,'a3')]]$type)
   
+  special <- ifelse(is.null(msglog[[paste0(player)]]$special),'',paste0(l,b,"Speciale Berichten:",msglog[[paste0(player)]]$special,b))
+  msglog[[paste0(player)]]$special <<- NULL
+  
   rapport <- paste0(
     l,b,
     'Rapport: ',playerDef$Label[playerDef$Player==player],b,
-    sample(1:30,1),' ',month.abb[floor(turn/yearCycle*12)],' ',year,b
+    sample(1:30,1),' ',month.abb[floor(((turn-1)%%yearCycle+1)/yearCycle*12)],' ',year,b
   )
   
   overzicht <- paste0(
@@ -53,12 +56,11 @@ generate_report <- function(session,tbs,tland,player,input,output,msgBattle){
   unitoverzicht <- generate_unit_report(tbs,player)
   landoverzicht <- generate_land_report(tland,player)
   
-  out <- paste(rapport,overzicht,acties,gevecht,bom,radar,unitoverzicht,landoverzicht,l,sep='')
+  out <- paste(rapport,overzicht,acties,gevecht,bom,radar,unitoverzicht,landoverzicht,special,l,sep='')
   out <- rectify(out,maxReportWidth)
   game[[paste(turn)]][[paste0('report',player)]] <<- out
   
   return(out)
-  
 }
 
 #-------------------------------------------#

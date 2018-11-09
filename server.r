@@ -181,6 +181,26 @@ server <- function(input, output, session) {
     }
   )
   
+  observe({
+    updateActionButton(session,"hostspecialsubmit",parse_special(input$hostspecial)$msg)
+  })
+  observeEvent(input$hostspecialsubmit,{
+    msg <- add_gold(input$hostspecial)
+    updateTextInput(session,"hostspecial",NULL,"")
+  })
+  
+  observeEvent(input$hostmsgsubmit,{
+    msg <- parse_special_msg(input$hostmsg)
+    if(msg$p=="ALL"){
+      for(p in unique(playerDef$Player)){
+        msglog[[paste0(p)]]$special <<- paste0(msglog[[p]]$special,b,msg$msg)
+      }
+    } else {
+      msglog[[paste0(msg$p)]]$special <<- paste0(msglog[[msg$p]]$special,b,msg$msg)
+    }
+    updateTextInput(session,"hostmsg",NULL,"")
+  })
+  
   #-------------------------------------------#
   # 2.d. OBSERVE: END OF TURN
   #-------------------------------------------#
@@ -267,14 +287,15 @@ server <- function(input, output, session) {
   #-------------------------------------------#
   # 3.c. RENDER: OTHER
   #-------------------------------------------#
-  output$p1Score <- renderUI({actionButton("p1Score",paste(playerDef$Label[1],playerDef$Gold[1]),width="100%",style=paste("background-color:",playerDef$Color[1]))}) # show score Player 1
-  output$p2Score <- renderUI({actionButton("p2Score",paste(playerDef$Label[2],playerDef$Gold[2]),width="100%",style=paste("background-color:",playerDef$Color[2]))}) # show score Player 2
-  if(nrow(playerDef)>=3){output$p3Score <- renderUI({actionButton("p3Score",paste(playerDef$Label[3],playerDef$Gold[3]),width="100%",style=paste("background-color:",playerDef$Color[3]))})} # show score Player 3 (if exists)
-  if(nrow(playerDef)>=4){output$p4Score <- renderUI({actionButton("p4Score",paste(playerDef$Label[4],playerDef$Gold[4]),width="100%",style=paste("background-color:",playerDef$Color[4]))})} # show score Player 4 (if exists)
-  
   observe({updateTextInput(session,"ip_address",value=paste0(ip,":",session$clientData$url_port))})
-  observe({updateTabsetPanel(session, "tab", selected = input$tab2)})
-  observe({updateTabsetPanel(session, "tab2", selected = input$tab)})
+  
+  lapply(                                                                                      # this will create player reports on the START of game
+    X = 1:nrow(playerDef),                                                                     # create one set for each player
+    FUN = function(i){
+      output[[paste0('report',playerDef$Player[i])]] <- renderUI({HTML(isolate(generate_report(session,d$bs,d$land,playerDef$Player[i],input,output)))}) # generate report, using isolate to ensure this only runs once
+      outputOptions(output,paste0('report',playerDef$Player[i]),suspendWhenHidden=F)           # this ensures updates are prioritized, even if output is on a hidden tab
+    }
+  )
   
   #-------------------------------------------#
   # 4. OBSERVE: EXPORTS
@@ -306,6 +327,7 @@ server <- function(input, output, session) {
       output$pxa1submit <- renderUI(actionButton("pxa1submit","",icon=icon("cog"),width="100%")) # render action submit for action 1
       output$pxa2submit <- renderUI(actionButton("pxa2submit","",icon=icon("cog"),width="100%")) # repeat for action 2
       output$pxa3submit <- renderUI(actionButton("pxa3submit","",icon=icon("cog"),width="100%")) # repeat for action 3
+      output$reportSlave <- renderUI({HTML(game[[paste(turn)]][[paste0('report',px$Player)]])}) # fetch report
       shinyjs::show(id = "pxgameoverviewdiv")                                                  # this is hidden if not logged in
       shinyjs::show(id = "pxactioninputdiv")                                                   # this is hidden if not logged in
       shinyjs::show(id = "pxreportdiv")                                                        # this is hidden if not logged in
@@ -314,17 +336,14 @@ server <- function(input, output, session) {
     }
   })
   
+  #-------------------------------------------#
+  # 5.b. observe action input
   lapply(                                                                                      # start creating observeEvents for player actions
     X = 1:3,                                                                                   # create one set for each player
     FUN = function(i){
-      #-------------------------------------------#
-      # 5.b. observe action input
       observe({
         updateActionButton(session,paste0('pxa',i,'submit'),label=paste(parse_and_check(d$bs,paste0(px$Player,'.',input[[paste0('pxa',i)]]))$action))
       })
-      
-      #-------------------------------------------#
-      # 5.c. observe action submissions
       observeEvent(input[[paste0('pxa',i,'submit')]],{                                         # if player submits an action:
         shinyjs::disable(paste0('pxa',i))                                                      # disable changing/editing the action
         shinyjs::disable(paste0('pxa',i,'submit'))                                             # disable the submit button itself
@@ -334,12 +353,12 @@ server <- function(input, output, session) {
       })
     }
   )
-
+  
   #-------------------------------------------#
   # 5.d. observe new turn
   observe({
     t5s()
-    if(newTurn==T){                                                                           # then game host has started a new turn
+    if(usr=='slave' & (newTurn==T | input$turnSlave < turn)){                                                                           # then game host has started a new turn
       d$bs <<- game[[paste(turn)]]$bs                                                         # fetch boardstate
       d$land <<- game[[paste(turn)]]$land                                                     # fetch landstate
       updateActionButton(session,"turnSlave",paste("turn:",turn))                             # update buttons
@@ -351,7 +370,7 @@ server <- function(input, output, session) {
         shinyjs::enable(paste0('pxa',i))                                                      # release action input
         shinyjs::enable(paste0('pxa',i,'submit'))                                             # release action submission
       }
-      newTurn <<- F                                                                           # put newTurn to False (for client only!)
+      newTurn <- F                                                                            # put newTurn to False (for client only!)
     }
   })
   

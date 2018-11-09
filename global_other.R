@@ -68,7 +68,7 @@ end_turn <- function(session,tbs,tland,input,output){
   year           <<- yearStart + floor(turn/yearCycle)                                     # increase year if necessary
   playerDef$Gold <<- playerDef$Gold + turnBonus                                            # add turn bonus
   playerDef$Gold <<- playerDef$Gold + ifelse(floor(turn/yearCycle)-floor((turn-1)/yearCycle)==1,yearBonus,0) # in case of new year, add year bonus
-  
+
   update_buttons(session)                                                                  # this will simply overwrite the current value
   
   #-------------------------------------------#

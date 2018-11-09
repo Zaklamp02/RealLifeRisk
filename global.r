@@ -101,6 +101,7 @@ game                          <- NULL
 game[[paste(turn)]][['bs']]   <- boardState
 game[[paste(turn)]][['land']] <- land
 
+
 actions <- list()
 for(i in playerDef$Player){
   for(j in 1:3){

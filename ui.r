@@ -107,14 +107,28 @@ ui <- dashboardPage(
                      #------------------------------#
                      # 3.a.4 ACTION INPUT CONTROLS
                      fluidRow(
-                       do.call(tabBox, c(id='tab2',width='100%',height=220,lapply(0:nrow(playerDef), function(i) {
+                       do.call(tabBox, c(id='tab2',width='100%', height="580px",lapply(0:nrow(playerDef), function(i) {
                          if(i==0){                                                                 # first create a tab for non-players  
                            tabPanel(                                                               # create a tabPanel    
                              title="X",                                                            # give it a name
                              fluidRow(                                                          
                                column(6,textInput('hostaction',NULL,"")),                          # create action input field
-                               actionButton("hostactionsubmit","",icon=icon("cog"))                # create action submission button that will also provide feedback on action validity
-                             )
+                               actionButton("hostactionsubmit","Actie",icon=icon("cog"))                # create action submission button that will also provide feedback on action validity
+                             ),
+                             fluidRow(                                                          
+                               column(6,textInput('hostspecial',NULL,"")),                          # create action input field
+                               actionButton("hostspecialsubmit","Speciale Actie",icon=icon("cog"))                # create action submission button that will also provide feedback on action validity
+                             ),
+                             fluidRow(                                                          
+                               column(6,textInput('hostmsg',NULL,"")),                          # create action input field
+                               actionButton("hostmsgsubmit","Stuur Bericht",icon=icon("cog"))                # create action submission button that will also provide feedback on action validity
+                             ),
+                             hr(),
+                             div(style = 'overflow-y:scroll; overflow-x: hidden; height:310px;',
+                                 uiOutput("battleResult"),
+                                 htmlOutput("testTxt"),
+                                 actionButton("printReportAll","Print All Reports", width="100%")
+                             )                            
                            )
                          } else {                                                                  # now start looping over players (as defined in playerDef)
                            tabPanel(                                                               # create tabPanel per player
@@ -130,31 +144,14 @@ ui <- dashboardPage(
                              fluidRow(
                                column(6,textInput(paste0(playerDef$Player[i],"a3"),NULL,paste0(playerDef$Player[i],"."))),
                                actionButton(paste0(playerDef$Player[i],"a3submit"),"",icon=icon("cog"))
-                             )
-                           )
-                          }
-                       })))
-                     ),
-                     
-                     #------------------------------#
-                     # 3.a.5 Feedback reports
-                     fluidRow(                                                                     # basically do the same as above, but for feedback reports
-                       do.call(tabBox, c(id='tab',width='100%',height=360,lapply(0:nrow(playerDef), function(i) { # again, loop over players
-                         if(i==0){                                                                 # start with creating a tab for game host
-                           tabPanel(
-                             title="X",                                                            # give it the same names as before
-                             uiOutput("battleResult"),                                              # create dynamic UI output
-                             fluidRow(actionButton("printReportAll","Print All Reports", width="100%"))
-                           )
-                         } else {
-                           tabPanel(
-                             title=playerDef$Label[i], 
-                             div(style = 'overflow-y:scroll; overflow-x: hidden; height:310px;',
+                             ),
+                             hr(),
+                             div(style = 'overflow-y:scroll; overflow-x:hidden; height:310px',
                                  fluidRow(uiOutput(paste0('report',playerDef$Player[i]))), 
                                  fluidRow(actionButton(paste0("printReport",playerDef$Player[i]),"Print Report", width="100%"))
-                             )
+                             )                            
                            )
-                         }
+                          }
                        })))
                      )
               )
@@ -280,7 +277,6 @@ ui <- dashboardPage(
 #    \||/\/\//\|/     
 #
 # 
-
 
 # tags$style(".nav-tabs {
 #            padding-top:0px;

@@ -32,19 +32,22 @@ shiny::runApp(app,host="0.0.0.0")
 #   - create game_tracker function (to log game progression/statistics)
 #   - create game_score function (to keep track of/assign scores)
 #   - improve check_action
-#   - shift key settings to .txt/.xls files
 #
 #   SERVER
 #   - improve plot efficiency (find alternative to ggplot?)
+#   - fix entire 'settings' screen
 #
 #   UI
-#   - improve app layout
-#   - add login screen
+#   - creat themes
 #   - add music
+#   - add score to header
+#
+#   NETWORKING
+#   - improve update speed/stability
+#   - fix report-updating
 #
 #   DATA WRANGLING
-#   - start using pipes
-#   - profile pipes
+#   - profileVis
 #
 ###############################################################################
 
@@ -56,10 +59,10 @@ shiny::runApp(app,host="0.0.0.0")
 #  a report is generated that can help debug the app and find (processing)
 #  bottlenecks. Should only be used for debugging/testing
 #
-library(profvis)
-profvis({
-  runApp()
-})
+#library(profvis)
+#profvis({
+#  runApp()
+#})
 #
 ###############################################################################
 

@@ -29,7 +29,7 @@ parse_action <- function(action){
       out$type   <- 'fout'
       out$action <- 'teveel elementen'
     } else{                                                                    # then either 3 or 4 elements
-      n <- unlist(regmatches(act[2], gregexpr("[[:digit:]]+", act[2])))
+      n <- as.numeric(unlist(regmatches(act[2], gregexpr("[[:digit:]]+", act[2]))))
       u <- unlist(regmatches(act[2], gregexpr("[[:alpha:]]+", act[2])))
       
       if(length(u) != length(n) & length(u) > 1){
@@ -233,15 +233,20 @@ execute_move_all <- function(tbs,tland,player,unit,quantity,x1,y1,path,subunit=N
   subunit  <- unlist(subunit)                # nice to have, cannot hurt
   subquantity <- unlist(subquantity)
   
-  tmp <- execute_move(tbs,tland,player,unit,quantity,x1,y1,path)
+  out <- execute_move(tbs,tland,player,unit,quantity,x1,y1,path)  
   
-  if(!is.null(subunit)){
-    for(i in 1:length(subunit)){
-      tmp <- execute_move(tmp$tbs,tmp$tland,player,subunit[i],subquantity[i],x1,y1,path)
+  if(is.null(subunit) & is.null(subquantity)){
+    
+  } else if(is.null(subunit) | is.null(subquantity)){
+    out$type <- 'fout'
+    out$msg  <- 'subunit als subquantity onbekend'
+  } else {
+    for(i in 2:length(subunit)){
+      out <- execute_move(out$tbs,out$tland,player,subunit[i],subquantity[i],x1,y1,path)
     }
   }
   
-  return(tmp)
+  return(out)
 }
 
 #-------------------------------------------#
@@ -443,7 +448,7 @@ do_action <- function(session,tbs,tland,action){
         msg$outcome <- paste0(msg$quantity," ",unitDef$Label[unitDef$Unit==msg$unit],"s gekocht op ",msg$y1,msg$x1)
       }
     } else {                                                                                    # if path is supplied, action must be a move
-      move   <- execute_move(tbs,tland,msg$player,msg$unit,msg$quantity,msg$x1,msg$y1,msg$path) # THEN actually perform the move
+      move   <- execute_move_all(tbs,tland,msg$player,msg$unit,msg$quantity,msg$x1,msg$y1,msg$path,msg$subunit,msg$subquantity) # THEN actually perform the move
       tbs    <- move$tbs
       tland  <- move$tland
       msg$outcome <- move$msg
@@ -539,6 +544,62 @@ bomb <- function(tbs,tland,xt,yt,player){
   
   return(list(tbs=tbs,tland=tland,msg=msg))
 }
+
+#-------------------------------------------#
+# 9. SPECIAL
+#-------------------------------------------#
+
+parse_special_msg <- function(msg){
+  
+  maxl <- max(nchar(playerDef$Player))
+  
+  p <- unlist(strsplit(substr(msg,1,maxl),'[.]'))                                      # try to split on '.' (CAN IMPROVE LATER!!!)
+  
+  if(!toupper(p) %in% playerDef$Player){   # then message is for one player
+    p <- "ALL"
+  } else {
+    p <- toupper(p)
+    msg <- sub(paste0(p,"."),"",msg)
+  }
+
+  return(list(p=p,msg=msg))
+}
+
+parse_special <- function(action){
+  act <- unlist(strsplit(action,'[.]'))                                      # try to split on '.' (CAN IMPROVE LATER!!!)
+
+  p <- toupper(act[1])
+  u <- unlist(regmatches(act[2], gregexpr("[[:alpha:]]+", act[2])))
+  n <- as.numeric(unlist(regmatches(act[2], gregexpr("[[:digit:]]+", act[2]))))
+  
+  if(grepl("-",act[2])){
+    n <- -n
+  }
+  
+  msg <- paste(n,u,p)
+  if(trimws(msg)=='NA'){
+    msg <- "Speciale Actie"
+  }
+  
+  return(list(msg=msg,n=n,u=u,p=p))
+}
+
+add_gold <- function(action){
+  
+  act <- parse_special(action)
+
+  if(act$p %in% playerDef$Player){
+    if(toupper(act$u) == "GOUD"){
+      if(is.numeric(act$n)){
+       playerDef$Gold[playerDef$Player==act$p] <<- playerDef$Gold[playerDef$Player==act$p] + act$n 
+      }
+    }
+  }
+  
+  return(act$msg)
+}
+
+
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # X. ARCHIVE
