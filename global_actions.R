@@ -40,11 +40,11 @@ parse_action <- function(action){
         out$action   <- paste('actie bevat', length(act),'elementen')
         out$player   <- toupper(act[1])                                        # log all elements
         out$unit     <- toupper(u[1])
-        out$quantity <- as.numeric(n[1])
+        out$quantity <- n[1]
         out$y1       <- toupper(gsub('\\D','', act[3]))
         out$x1       <- toupper(gsub('\\d','', act[3]))
         out$path     <- toupper(gsub('\\d','', act[4]))
-        if(is.na(out$quantity)){out$quantity<-'1'}                             # can be valid for special actions; i.e. radar, bomb
+        if(is.na(out$quantity)){out$quantity<-1}                               # can be valid for special actions; i.e. radar, bomb
         if(length(u)>1){                                                       # then multi-unit
           out$subunit <- list(u)
           out$subquantity <- list(n)
@@ -124,12 +124,16 @@ check_action <- function(tbs,player,unit,quantity,x1,y1,path,subunit=NULL,subqua
   return(out)
 }
 
-check_action_all <- function(tbs,player,unit,quantity,x1,y1,path,subunit=NULL,subquantity=NULL){
+check_action_multiple <- function(tbs,player,unit,quantity,x1,y1,path,subunit=NULL,subquantity=NULL){
   
   subunit  <- unlist(subunit)                # nice to have, cannot hurt
   subquantity <- unlist(subquantity)
   
   out <- check_action(tbs,player,unit,quantity,x1,y1,path)
+  
+  #
+  # this is where checks for loading happen
+  #
   
   if(out$type=='succes' & !is.null(subunit)){
     for(i in 1:length(subunit)){
@@ -145,7 +149,7 @@ check_action_all <- function(tbs,player,unit,quantity,x1,y1,path,subunit=NULL,su
 parse_and_check <- function(tbs,action){
   prs <- parse_action(action)
   if(prs$type=="succes"){
-    prs <- check_action_all(tbs,prs$player,prs$unit,prs$quantity,prs$x1,prs$y1,prs$path,prs$subunit,prs$subquantity)
+    prs <- check_action_multiple(tbs,prs$player,prs$unit,prs$quantity,prs$x1,prs$y1,prs$path,prs$subunit,prs$subquantity)
   }
   return(prs)
 }
@@ -229,20 +233,17 @@ execute_move <- function(tbs,tland,player,unit,quantity,x1,y1,path){
   return(list(tbs=tbs,tland=tland,msg=msg))
 }
 
-execute_move_all <- function(tbs,tland,player,unit,quantity,x1,y1,path,subunit=NULL,subquantity=NULL){
-  subunit  <- unlist(subunit)                # nice to have, cannot hurt
+execute_move_multiple <- function(tbs,tland,player,unit,quantity,x1,y1,path,subunit=NULL,subquantity=NULL){
+  subunit     <- unlist(subunit)                                               # nice to have, cannot hurt
   subquantity <- unlist(subquantity)
-  
-  out <- execute_move(tbs,tland,player,unit,quantity,x1,y1,path)  
-  
-  if(is.null(subunit) & is.null(subquantity)){
-    
-  } else if(is.null(subunit) | is.null(subquantity)){
-    out$type <- 'fout'
+  out         <- execute_move(tbs,tland,player,unit,quantity,x1,y1,path)       # if anything, we will need to move the main unit
+
+  if(xor(is.null(subunit),is.null(subquantity))){                              # then EITHER subunit or subquantity is lacking
+    out$type <- 'fout'                                                         # then escape (also: this means check_action failed!)
     out$msg  <- 'subunit als subquantity onbekend'
-  } else {
-    for(i in 2:length(subunit)){
-      out <- execute_move(out$tbs,out$tland,player,subunit[i],subquantity[i],x1,y1,path)
+  } else if(!is.null(subunit) & !is.null(subquantity)){                        # then BOTH subunit and subquantity exist (=good!)
+    for(i in 2:length(subunit)){                                               # start at 2, because we already moved unit 1
+      out <- execute_move(out$tbs,out$tland,player,subunit[i],subquantity[i],x1,y1,path) # perform move
     }
   }
   
@@ -448,7 +449,7 @@ do_action <- function(session,tbs,tland,action){
         msg$outcome <- paste0(msg$quantity," ",unitDef$Label[unitDef$Unit==msg$unit],"s gekocht op ",msg$y1,msg$x1)
       }
     } else {                                                                                    # if path is supplied, action must be a move
-      move   <- execute_move_all(tbs,tland,msg$player,msg$unit,msg$quantity,msg$x1,msg$y1,msg$path,msg$subunit,msg$subquantity) # THEN actually perform the move
+      move   <- execute_move_multiple(tbs,tland,msg$player,msg$unit,msg$quantity,msg$x1,msg$y1,msg$path,msg$subunit,msg$subquantity) # THEN actually perform the move
       tbs    <- move$tbs
       tland  <- move$tland
       msg$outcome <- move$msg

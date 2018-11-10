@@ -46,7 +46,7 @@ end_turn <- function(session,tbs,tland,input,output){
   
   #-------------------------------------------#
   # 1.3. HOUSEKEEPING A
-  tbs$unit[tbs$unit=="E"] <- "P"                                                           # at the end of turn, change paratroopers to platoons
+  tbs$unit[tbs$unit=='PAR'] <- 'PLT'                                                       # at the end of turn, change paratroopers to platoons
   tbs           <- simplify_board(tbs)                                                     # check board if necessary
   for(i in 1:nrow(playerDef)){
     playerDef$Land[i] <<- sum(tland[,,1]  == playerDef$red[i]/255 & tland[,,2]  == playerDef$green[i]/255 & tland[,,3]  == playerDef$blue[i]/255)  
@@ -330,6 +330,10 @@ relable <- function(v, m){
   }
   
   return(v)
+}
+
+rgb2hex <- function(playerDef,alpha=1){
+  return(rgb(playerDef$red/255,playerDef$green/255,playerDef$blue/255,alpha))
 }
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

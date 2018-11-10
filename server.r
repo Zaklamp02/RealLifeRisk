@@ -92,15 +92,49 @@ server <- function(input, output, session) {
   })
   
   #-------------------------------------------#
-  # 2.c. OBSERVE: ACTION SUBMISSION
+  # 2.c. OBSERVE: HOST ACTIONS
   #-------------------------------------------#
+  
+  # host action
   observe({                                                                                    # this will automatically update if ANYTHING inside {} changes value
     updateActionButton(                                                                        # if so, update the label in the submission button
       session,                                                                                 # required parameter
       'hostactionsubmit',                                                                      # ID of the submission button
       label=paste(parse_and_check(d$bs,input$hostaction)$action))                              # Value of the submit button. Automatically refreshes as input$hosaction changes, because of observe{}
   })
+  observeEvent(input$hostactionsubmit, {
+    result <- do_action(session,d$bs,d$land,input$hostaction)
+    d$bs   <- result$tbs
+    d$land <- result$tland
+    updateTextInput(session,"hostaction",NULL,'')
+    updateActionButton(session,"hostactionsubmit",label=paste(result$msg$type,result$msg$action,sep=" , "))
+  })
   
+  # host special action
+  observe({
+    updateActionButton(session,"hostspecialsubmit",parse_special(input$hostspecial)$msg)
+  })
+  observeEvent(input$hostspecialsubmit,{
+    msg <- add_gold(input$hostspecial)
+    updateTextInput(session,"hostspecial",NULL,"")
+  })
+  
+  # host message
+  observeEvent(input$hostmsgsubmit,{
+    msg <- parse_special_msg(input$hostmsg)
+    if(msg$p=="ALL"){
+      for(p in unique(playerDef$Player)){
+        msglog[[paste0(p)]]$special <<- paste0(msglog[[p]]$special,b,msg$msg)
+      }
+    } else {
+      msglog[[paste0(msg$p)]]$special <<- paste0(msglog[[msg$p]]$special,b,msg$msg)
+    }
+    updateTextInput(session,"hostmsg",NULL,"")
+  })
+  
+  
+  #-------------------------------------------#
+  # 2.c.1 OBSERVE: PLAYER ACTIONS
   lapply(                                                                                      # start creating observeEvents for player actions
     X = 1:nrow(playerDef),                                                                     # create one set for each player
     FUN = function(i){
@@ -109,19 +143,19 @@ server <- function(input, output, session) {
       observe({
         updateActionButton(                                                                    # exactly the same logic as for 'hostactionsubmit'
           session,paste0(playerDef$Player[i],'a1submit'),                                      # check if player is writing an action
-          label=paste(parse_and_check(d$bs,input[[paste0(playerDef$Player[i],'a1')]])$action)  # if so, evaluate the action and report back on validity
+          label=paste(parse_and_check(isolate(d$bs),input[[paste0(playerDef$Player[i],'a1')]])$action)  # if so, evaluate the action and report back on validity. Use isolate(d$bs) to only trigger refresh as text input changes
         )
       })
       observe({
         updateActionButton(
           session,paste0(playerDef$Player[i],'a2submit'),
-          label=paste(parse_and_check(d$bs,input[[paste0(playerDef$Player[i],'a2')]])$action)
+          label=paste(parse_and_check(isolate(d$bs),input[[paste0(playerDef$Player[i],'a2')]])$action)
         )
       })
       observe({
         updateActionButton(
           session,paste0(playerDef$Player[i],'a3submit'),
-          label=paste(parse_and_check(d$bs,input[[paste0(playerDef$Player[i],'a3')]])$action)
+          label=paste(parse_and_check(isolate(d$bs),input[[paste0(playerDef$Player[i],'a3')]])$action)
         )
       })
       
@@ -180,26 +214,6 @@ server <- function(input, output, session) {
       })
     }
   )
-  
-  observe({
-    updateActionButton(session,"hostspecialsubmit",parse_special(input$hostspecial)$msg)
-  })
-  observeEvent(input$hostspecialsubmit,{
-    msg <- add_gold(input$hostspecial)
-    updateTextInput(session,"hostspecial",NULL,"")
-  })
-  
-  observeEvent(input$hostmsgsubmit,{
-    msg <- parse_special_msg(input$hostmsg)
-    if(msg$p=="ALL"){
-      for(p in unique(playerDef$Player)){
-        msglog[[paste0(p)]]$special <<- paste0(msglog[[p]]$special,b,msg$msg)
-      }
-    } else {
-      msglog[[paste0(msg$p)]]$special <<- paste0(msglog[[msg$p]]$special,b,msg$msg)
-    }
-    updateTextInput(session,"hostmsg",NULL,"")
-  })
   
   #-------------------------------------------#
   # 2.d. OBSERVE: END OF TURN

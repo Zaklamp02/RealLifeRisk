@@ -27,6 +27,9 @@ shiny::runApp(app,host="0.0.0.0")
 #   GENERAL
 #   - improve end of turn sequence
 #   - add save/continue / turn counters
+#   - improve host screen
+#     - button feedback
+#   - improve button feedback after submit
 #
 #   GLOBAL
 #   - create game_tracker function (to log game progression/statistics)
@@ -41,6 +44,7 @@ shiny::runApp(app,host="0.0.0.0")
 #   - creat themes
 #   - add music
 #   - add score to header
+#   - improve scaling with screen res (e.g. of report part)
 #
 #   NETWORKING
 #   - improve update speed/stability
