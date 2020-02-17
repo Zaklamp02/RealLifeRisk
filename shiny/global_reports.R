@@ -31,14 +31,15 @@ generate_report <- function(session,tbs,tland,player,input,output,msgBattle=''){
   rapport <- paste0(
     l,b,
     'Rapport: ',playerDef$Label[playerDef$Player==player],b,
-    sample(1:30,1),' ',month.abb[floor(((turn-1)%%yearCycle+1)/yearCycle*12)],' ',year,b
+    sample(1:30,1),' ',month.abb[floor(((turn-1)%%yearCycle+1)/yearCycle*12)],' ',year,' (beurt ',turn-1,')',b
   )
   
   overzicht <- paste0(
     l,b,
     'Overzicht:',b,
     'Goud: ',playerDef$Gold[playerDef$Player==player],b,
-    'Land: ',playerDef$Land[playerDef$Player==player],' (',round(100*playerDef$Land[playerDef$Player==player]/prod(gridSize)),'%)',b
+    'Land: ',playerDef$Land[playerDef$Player==player],' (',round(100*playerDef$Land[playerDef$Player==player]/prod(gridSize)),'%)',b,
+    'Leger: ',calculate_army_value(tbs,player),b
   )
   
   acties <- paste0(

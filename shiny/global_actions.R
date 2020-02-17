@@ -40,11 +40,11 @@ parse_action <- function(action){
         out$action   <- paste('actie bevat', length(act),'elementen')
         out$player   <- toupper(act[1])                                        # log all elements
         out$unit     <- toupper(u[1])
-        out$quantity <- n[1]
+        out$quantity <- as.numeric(n[1])
         out$y1       <- toupper(gsub('\\D','', act[3]))
         out$x1       <- toupper(gsub('\\d','', act[3]))
         out$path     <- toupper(gsub('\\d','', act[4]))
-        if(is.na(out$quantity)){out$quantity<-1}                               # can be valid for special actions; i.e. radar, bomb
+        if(is.na(out$quantity)){out$quantity<-1}                             # can be valid for special actions; i.e. radar, bomb
         if(length(u)>1){                                                       # then multi-unit
           out$subunit <- list(u)
           out$subquantity <- list(n)
@@ -98,7 +98,7 @@ check_action <- function(tbs,player,unit,quantity,x1,y1,path,subunit=NULL,subqua
     out$action  <- 'onjuiste beweging'
   } else if(!is.na(path) & unit!=unitDef$Unit[1] & unit!=unitDef$Unit[2]) {
     pathSep <- unlist(strsplit(path,NULL))                                                               # separate path into individual components
-    destE  <- sum(pathSep %in% c("R","W")) - sum(pathSep %in% c("L","O"))                                # calculate horizontal movement (in squares)
+    destE  <- sum(pathSep %in% c("R","O")) - sum(pathSep %in% c("L","W"))                                # calculate horizontal movement (in squares)
     destN  <- sum(pathSep %in% c("U","N")) - sum(pathSep %in% c("D","Z"))                                # calculate vertical movement (in squares)
     x2      <- ifelse(which(x1==xNames)+destE<=0,NA,xNames[which(x1==xNames)+destE])                     # find target x coördinate
     y2      <- ifelse(which(y1==yNames)+destN<=0,NA,yNames[which(y1==yNames)+destN])                     # find target y coördinate
@@ -110,33 +110,49 @@ check_action <- function(tbs,player,unit,quantity,x1,y1,path,subunit=NULL,subqua
     } else if(!any(tbs$unit[tbs$xPos==x1 & tbs$yPos==y1 & tbs$player==player] %in% unit)){               # check if player has TARGET UNIT on square
       out$action  <- paste(unit,'niet op startcoördinaat')
     } else if(tbs$quantity[tbs$xPos==x1 & tbs$yPos==y1 & tbs$player==player & tbs$unit==unit] < quantity){ # check if player has sufficient QUANTITY of units
-      out$action  <- paste0('Onvoldoende ',unit,' op ',x1,y1)
+      out$action  <- paste0('Onvoldoende ',unit,' op ',y1,x1)
     } else if(nchar(path) > unitDef$Speed[unitDef$Unit==unit]){                                          # check if unit can move far enough
-      out$action  <- 'Verplaatsing te ver'
+      #--------#      
+      ## "VRACHTWAGEN" LOGIC ## NOT PERFECT! ##
+      #--------#
+      if((unit != "VRW") & ("VRW" %in% subunit)){                                                        # if VRW is present, unit may travel in VRW
+        occ <- unitDef$Size[unitDef$Unit==unit] * quantity
+        cap <- unitDef$Capacity[unitDef$Unit=="VRW"] * subquantity[which("VRW" %in% subunit)]                                 # it is already established that "VRW" is present in subunit
+        if(occ > cap){
+          out$action <- 'Geen capaciteit'
+        } else if(is.na(x2) | is.na(y2)){                                                                       # check if target coördinate is valid
+          out$action  <- 'Doelcoördinaat buiten kaart'
+        } else {
+          out$type <- 'succes'
+          out$action  <- paste0("Verplaats ",quantity,unit,' naar ',x2,y2)
+        }
+      } else {
+        out$action  <- 'Verplaatsing te ver'
+      }
+      #--------#
     } else if(is.na(x2) | is.na(y2)){                                                                    # check if target coördinate is valid
       out$action  <- 'Doelcoördinaat buiten kaart'
     } else {
       out$type <- 'succes'
-      out$action  <- paste0("Verplaats ",quantity,unit,' naar ',y2,x2)
+      out$action  <- paste0("Verplaats ",quantity,unit,' naar ',x2,y2)
     }
   }
   
   return(out)
 }
 
-check_action_multiple <- function(tbs,player,unit,quantity,x1,y1,path,subunit=NULL,subquantity=NULL){
+check_action_all <- function(tbs,player,unit,quantity,x1,y1,path,subunit=NULL,subquantity=NULL){
   
   subunit  <- unlist(subunit)                # nice to have, cannot hurt
   subquantity <- unlist(subquantity)
   
   out <- check_action(tbs,player,unit,quantity,x1,y1,path)
   
-  #
-  # this is where checks for loading happen
-  #
-  
   if(out$type=='succes' & !is.null(subunit)){
     for(i in 1:length(subunit)){
+      
+      # VRACHTWAGEN LOGIC: IF PELETON && VRACHTWAGEN, USE
+      
       out <- check_action(tbs,player,subunit[i],subquantity[i],x1,y1,path,subunit,subquantity) #strsplit(path,'')[[1]][1],NULL,NULL)
       if(out$type=='fout'){break}
     }
@@ -149,7 +165,7 @@ check_action_multiple <- function(tbs,player,unit,quantity,x1,y1,path,subunit=NU
 parse_and_check <- function(tbs,action){
   prs <- parse_action(action)
   if(prs$type=="succes"){
-    prs <- check_action_multiple(tbs,prs$player,prs$unit,prs$quantity,prs$x1,prs$y1,prs$path,prs$subunit,prs$subquantity)
+    prs <- check_action_all(tbs,prs$player,prs$unit,prs$quantity,prs$x1,prs$y1,prs$path,prs$subunit,prs$subquantity)
   }
   return(prs)
 }
@@ -233,17 +249,20 @@ execute_move <- function(tbs,tland,player,unit,quantity,x1,y1,path){
   return(list(tbs=tbs,tland=tland,msg=msg))
 }
 
-execute_move_multiple <- function(tbs,tland,player,unit,quantity,x1,y1,path,subunit=NULL,subquantity=NULL){
-  subunit     <- unlist(subunit)                                               # nice to have, cannot hurt
+execute_move_all <- function(tbs,tland,player,unit,quantity,x1,y1,path,subunit=NULL,subquantity=NULL){
+  subunit  <- unlist(subunit)                # nice to have, cannot hurt
   subquantity <- unlist(subquantity)
-  out         <- execute_move(tbs,tland,player,unit,quantity,x1,y1,path)       # if anything, we will need to move the main unit
-
-  if(xor(is.null(subunit),is.null(subquantity))){                              # then EITHER subunit or subquantity is lacking
-    out$type <- 'fout'                                                         # then escape (also: this means check_action failed!)
+  
+  out <- execute_move(tbs,tland,player,unit,quantity,x1,y1,path)  
+  
+  if(is.null(subunit) & is.null(subquantity)){
+    
+  } else if(is.null(subunit) | is.null(subquantity)){
+    out$type <- 'fout'
     out$msg  <- 'subunit als subquantity onbekend'
-  } else if(!is.null(subunit) & !is.null(subquantity)){                        # then BOTH subunit and subquantity exist (=good!)
-    for(i in 2:length(subunit)){                                               # start at 2, because we already moved unit 1
-      out <- execute_move(out$tbs,out$tland,player,subunit[i],subquantity[i],x1,y1,path) # perform move
+  } else {
+    for(i in 2:length(subunit)){
+      out <- execute_move(out$tbs,out$tland,player,subunit[i],subquantity[i],x1,y1,path)
     }
   }
   
@@ -446,10 +465,10 @@ do_action <- function(session,tbs,tland,action){
       } else {                                                                                   # then assume we want to move stuff
         tbs    <- buy_unit(tbs,msg$player,msg$unit,msg$quantity,msg$x1,msg$y1)
         tland  <- updateMapOwner(tland,msg$x1,msg$y1,msg$player)
-        msg$outcome <- paste0(msg$quantity," ",unitDef$Label[unitDef$Unit==msg$unit],"s gekocht op ",msg$y1,msg$x1)
+        msg$outcome <- paste0(msg$quantity," ",unitDef$Label[unitDef$Unit==msg$unit],"s gekocht op ",msg$x1,msg$y1)
       }
     } else {                                                                                    # if path is supplied, action must be a move
-      move   <- execute_move_multiple(tbs,tland,msg$player,msg$unit,msg$quantity,msg$x1,msg$y1,msg$path,msg$subunit,msg$subquantity) # THEN actually perform the move
+      move   <- execute_move_all(tbs,tland,msg$player,msg$unit,msg$quantity,msg$x1,msg$y1,msg$path,msg$subunit,msg$subquantity) # THEN actually perform the move
       tbs    <- move$tbs
       tland  <- move$tland
       msg$outcome <- move$msg
@@ -571,8 +590,8 @@ parse_special <- function(action){
 
   p <- toupper(act[1])
   u <- unlist(regmatches(act[2], gregexpr("[[:alpha:]]+", act[2])))
-  n <- as.numeric(unlist(regmatches(act[2], gregexpr("[[:digit:]]+", act[2]))))
-  
+  n <- as.numeric(unlist(regmatches(act[3], gregexpr("[[:digit:]]+", act[3]))))
+
   if(grepl("-",act[2])){
     n <- -n
   }

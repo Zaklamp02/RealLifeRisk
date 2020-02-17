@@ -46,7 +46,7 @@ end_turn <- function(session,tbs,tland,input,output){
   
   #-------------------------------------------#
   # 1.3. HOUSEKEEPING A
-  tbs$unit[tbs$unit=='PAR'] <- 'PLT'                                                       # at the end of turn, change paratroopers to platoons
+  tbs$unit[tbs$unit=="PAR"] <- "PLT"                                                       # at the end of turn, change paratroopers to platoons
   tbs           <- simplify_board(tbs)                                                     # check board if necessary
   for(i in 1:nrow(playerDef)){
     playerDef$Land[i] <<- sum(tland[,,1]  == playerDef$red[i]/255 & tland[,,2]  == playerDef$green[i]/255 & tland[,,3]  == playerDef$blue[i]/255)  
@@ -68,8 +68,10 @@ end_turn <- function(session,tbs,tland,input,output){
   year           <<- yearStart + floor(turn/yearCycle)                                     # increase year if necessary
   playerDef$Gold <<- playerDef$Gold + turnBonus                                            # add turn bonus
   playerDef$Gold <<- playerDef$Gold + ifelse(floor(turn/yearCycle)-floor((turn-1)/yearCycle)==1,yearBonus,0) # in case of new year, add year bonus
-
+  playerDef$Gold <<- playerDef$Gold + landBonus * playerDef$Land                           # add land bonus (bonus * number of occupied land tiles)
+  
   update_buttons(session)                                                                  # this will simply overwrite the current value
+#  msglog    <<- list()
   
   #-------------------------------------------#
   # 1.6. SAVE RESULTS
@@ -92,7 +94,7 @@ end_turn <- function(session,tbs,tland,input,output){
 #
 #-------------------------------------------#
 
-save_turn <- function(session,tbs,tland,saveFiles=F){
+save_turn <- function(session,tbs,tland,saveFiles=T){
   game[[paste(turn)]][['bs']] <<- tbs                                                     # store boardstate
   game[[paste(turn)]][['land']] <<- tland                                                 # store land ownership
   game[[paste(turn)]][['msglog']] <<- msglog
@@ -102,7 +104,7 @@ save_turn <- function(session,tbs,tland,saveFiles=F){
   }
   
   if(saveFiles==T){
-    saveRDS(game,file.path(wd,'savegame',paste0("Game_",gameID,"_turn_",turn,".rds")))    # save entire game
+#    saveRDS(game,file.path(wd,'savegame',paste0("Game_",gameID,"_turn_",turn,".rds")))    # save entire game
     png(file.path(wd,'savegame',paste0("Game_",gameID,"_turn_",turn,'.png')),             # save png of boardState
         width=gridRes[1],height=gridRes[2])
     plot.new()
@@ -132,6 +134,17 @@ save_turn <- function(session,tbs,tland,saveFiles=F){
 #-------------------------------------------#
 
 render_board <- function(tbs,tland){
+#  terrain <- parse_terrain(boardDef)
+#  par(mar=rep(0,4))                                                                        # set figure margins to 0
+#  plot.window(xlim=c(0,gridRes[1]),ylim=c(0,gridRes[2]))                                   # create a window with correct size
+#  rasterImage(spr[['board']],0,0,gridRes[1],gridRes[2])                                    # create 'base layer' of game map to start drawing on
+#  rasterImage(terrain$terrain,0,0,gridRes[1],gridRes[2],interpolate=F)                     # create layer for cities and water
+#  plot(terrain$p,add=T,density=10,col='darkgrey')                                          # add texture to cities and water
+#  text(x=seq(0,gridRes[1]-sprRes[1],sprRes[1])+sprRes[1]/5, y = gridRes[2]+sprRes[1]/4, labels = xNames, font=2) # create coördinate labels along x axis
+#  text(x=-sprRes[1]/4, y = seq(0,gridRes[2]-sprRes[2],sprRes[2])+sprRes[1]/5, labels = yNames, font=2) # create coördinate labels along y axis
+}
+
+render_state <- function(tbs,tland){
   terrain <- parse_terrain(boardDef)
   par(mar=rep(0,4))                                                                        # set figure margins to 0
   plot.window(xlim=c(0,gridRes[1]),ylim=c(0,gridRes[2]))                                   # create a window with correct size
@@ -139,14 +152,10 @@ render_board <- function(tbs,tland){
   rasterImage(terrain$terrain,0,0,gridRes[1],gridRes[2],interpolate=F)                     # create layer for cities and water
   plot(terrain$p,add=T,density=10,col='darkgrey')                                          # add texture to cities and water
   text(x=seq(0,gridRes[1]-sprRes[1],sprRes[1])+sprRes[1]/5, y = gridRes[2]+sprRes[1]/4, labels = xNames, font=2) # create coördinate labels along x axis
-  text(x=-sprRes[1]/4, y = seq(0,gridRes[2]-sprRes[2],sprRes[2])+sprRes[1]/5, labels = yNames, font=2) # create coördinate labels along y axis
-}
-
-render_state <- function(tbs,tland){
-  par(mar=rep(0,4))                                                                        # set figure margins to 0
-  plot.window(xlim=c(0,gridRes[1]),ylim=c(0,gridRes[2]))                                   # create a window with correct size
+  text(x=-sprRes[1]/4, y = seq(0,gridRes[2]-sprRes[2],sprRes[2])+sprRes[1]/5, labels = yNames, font=2) # create coördinate labels along y axis  par(mar=rep(0,4))                                                                        # set figure margins to 0
+#  plot.window(xlim=c(0,gridRes[1]),ylim=c(0,gridRes[2]))                                   # create a window with correct size
   rasterImage(tland,0,0,gridRes[1],gridRes[2],interpolate=F)                               # create 'base layer' of game map to start drawing on
-  
+
   for(i in 1:nrow(tbs)){                                                                   # loop over all units in boardState
     hits <- which(tbs[i,'xRes'] == tbs$xRes & tbs[i,'yRes'] == tbs$yRes)
     
@@ -199,7 +208,7 @@ updateMapOwner <- function(land,x,y,player=NULL){
     land[y,x,1] <- playerDef$red[playerDef$Player==player]/255                             # otherwise, assing player color
     land[y,x,2] <- playerDef$green[playerDef$Player==player]/255
     land[y,x,3] <- playerDef$blue[playerDef$Player==player]/255
-    land[y,x,4] <- mapAlpha
+    land[y,x,4] <- 0.5                                                                     # alpha
   }
   return(land)
 }
@@ -332,8 +341,18 @@ relable <- function(v, m){
   return(v)
 }
 
-rgb2hex <- function(playerDef,alpha=1){
-  return(rgb(playerDef$red/255,playerDef$green/255,playerDef$blue/255,alpha))
+#-------------------------------------------#
+# 11. CALCULATE ARMY VALUE
+#-------------------------------------------#
+
+calculate_army_value <- function(bs,player){
+  bs_player <- bs[bs$player==player,]
+  army_value <- 0
+  
+  for(i in 1:nrow(bs_player)){
+    army_value <- army_value + unitDef$Cost[unitDef$Unit==bs_player$unit[i]]*bs_player$quantity[i]
+  }
+  return(army_value)
 }
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

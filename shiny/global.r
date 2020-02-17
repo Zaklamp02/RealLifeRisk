@@ -61,6 +61,7 @@ pNames   <- playerDef$Player                                                    
 scrnRes  <- c(scrnResX,scrnResY)                                                            # screen resolution
 gridSize <- c(length(xNames),length(yNames))                                                # size of game board 
 sprRes   <- rep(floor(scrnRes[1]*0.73/gridSize[1]),2)                                       # resolution of sprites/units (scaled to match screen resolution)
+sprRes   <- c(44,44)
 gridRes  <- gridSize*sprRes                                                                 # resolution of gameboard
 gameID   <- paste0(LETTERS[sample(1:26,1)],LETTERS[sample(1:26,1)],LETTERS[sample(1:26,1)],sample(111:999,1))
 yearStart<- year
@@ -75,6 +76,7 @@ newTurn  <- FALSE                                                               
 # Create initial board state
 boardState <- data.frame(xPos=NA,yPos=NA,xRes=NA,yRes=NA,player=NA,unit=NA,quantity=NA)
 land       <- array(rep(0,gridSize[2]*gridSize[1]*4),c(gridSize[2],gridSize[1],4))          # create land variable after function definition!
+
 for(i in 1:nrow(playerDef)){
   loc <- which(boardDef==paste0("P",i),arr.ind=T)
   for(j in 1:nrow(unitDef)){

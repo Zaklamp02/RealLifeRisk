@@ -1,0 +1,46 @@
+library paths:
+... C:/Users/sebas/Documents/GitHub/RealLifeRisk/R-Portable/App/R-Portable/library
+Loading required package: shiny
+
+Attaching package: 'shinydashboard'
+
+The following object is masked from 'package:graphics':
+
+    box
+
+
+Attaching package: 'shinyjs'
+
+The following object is masked from 'package:shiny':
+
+    runExample
+
+The following objects are masked from 'package:methods':
+
+    removeClass, show
+
+
+Attaching package: 'DT'
+
+The following objects are masked from 'package:shiny':
+
+    dataTableOutput, renderDataTable
+
+Linking to ImageMagick 6.9.9.14
+Enabled features: cairo, freetype, fftw, ghostscript, lcms, pango, rsvg, webp
+Disabled features: fontconfig, x11
+Loading required package: sp
+
+Attaching package: 'raster'
+
+The following object is masked from 'package:shinyjs':
+
+    click
+
+rgeos version: 0.4-1, (SVN revision 579)
+ GEOS runtime version: 3.6.1-CAPI-1.10.1 
+ Linking to sp version: 1.3-1 
+ Polygon checking: TRUE 
+
+
+Listening on http://0.0.0.0:3049

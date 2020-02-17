@@ -106,16 +106,6 @@ ui <- dashboardPage(
 
                      #------------------------------#
                      # 3.a.4 ACTION INPUT CONTROLS
-                     tags$style(
-                       HTML(
-                         paste0(".nav-tabs-custom .nav-tabs li.active a:hover{background-color: ",rgb(t(col2rgb("grey")/255),alpha=0.8),";}"),                       # tab-color while hovering (selected tab)      
-                         paste0(".nav-tabs-custom .nav-tabs li a:hover{background-color: ",rgb(t(col2rgb("grey")/255),alpha=0.8),";}"),                              # tab-color while hovering (unselected tabs)                  
-                         paste0(".nav-tabs-custom .nav-tabs li a[data-value='X']{background-color:",rgb(t(col2rgb("grey")/255),alpha=0.3),";}"),                     # tab-color for non-player
-                         paste0(".nav-tabs-custom .nav-tabs li a[data-value='",playerDef$Label,"']{background-color:",rgb2hex(playerDef,mapAlpha),";}",collapse=""), # tab-color for players
-                         paste0(paste0('#',rep(playerDef$Player,3),'a',1:3),'{background-color:',rgb2hex(playerDef,mapAlpha),';}',collapse="")),                     # creates background for action buttons
-                         paste0(".nav-tabs-custom .nav-tabs li.active {border-top-color: grey;}")                                                                    # top-stripe color for selected tab
-                     ),
-                     
                      fluidRow(
                        do.call(tabBox, c(id='tab2',width='100%', height="580px",lapply(0:nrow(playerDef), function(i) {
                          if(i==0){                                                                 # first create a tab for non-players  
