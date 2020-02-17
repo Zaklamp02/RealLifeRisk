@@ -60,7 +60,7 @@ RealLifeRiskR kent de volgende structuur:
 
 > RealLifeRisk/  
 > - R-Portable/  
-> - shiny/  
+> - RealLifeRiskR/  
 > - RealLifeRisk.vbs  
 
 Start het spel door RealLifeRisk.vbs te openen. De makkelijkste manier om RealLifeRisk te krijgen is om de .zip te downloaden
@@ -68,7 +68,7 @@ uit dropbox (), of om iemand te zoeken die alle bestanden al op een USB stick he
 De op één na makkelijkste manier is om zelf een map te maken:
 
 1. Maak een map 'RealLifeRisk/' aan
-2. Download RealLifeRisk.vbs en de 'shiny/' map van [GitHub](https://github.com/Zaklamp02/RealLifeRisk)
+2. Download in deze map de bestanden uit [GitHub](https://github.com/Zaklamp02/RealLifeRisk)
 4. Download [R-Portable](https://sourceforge.net/projects/rportable/) en installeer in 'RealLifeRisk/'
 5. Open R-Portable.exe en typ acter elkaar de volgende commando's:
    - install.packages('shiny')

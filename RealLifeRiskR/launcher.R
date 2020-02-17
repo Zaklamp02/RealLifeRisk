@@ -7,4 +7,4 @@ launch.browser = function(appUrl, browser.path=chrome.portable) {
   shell(sprintf('"%s" --app=%s', browser.path, appUrl))
 }
 
-shiny::runApp("./shiny",launch.browser=T,host="0.0.0.0")
+shiny::runApp("./RealLifeRiskR",launch.browser=T,host="0.0.0.0")
