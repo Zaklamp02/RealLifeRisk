@@ -25,6 +25,7 @@ library(shiny)
 library(shinyWidgets)
 library(shinydashboard)
 library(shinyjs)
+library(shinyanimate)
 library(png)
 library(DT)
 library(magick)
@@ -43,6 +44,8 @@ boardDef  <- data.frame(read_excel(file.path(wd,'www','Settings.xlsx'), skip=1, 
 gameDef   <- data.frame(read_excel(file.path(wd,'www','Settings.xlsx'), skip=1, sheet="Settings")) # player specification
 playerDef <- data.frame(read_excel(file.path(wd,'www','Settings.xlsx'), skip=1, sheet="Spelers"))  # add colors (in rgb) to player specification
 playerDef <- cbind(playerDef,t(col2rgb(playerDef$Color)))                                          # add player color in RGB
+hexcol    <- rgb(t(col2rgb(playerDef$Color)),alpha=100,maxColorValue=255)
+playerDef <- cbind(playerDef,hexcol)
 msglog    <- list()
 
 # Basic game settings
@@ -60,8 +63,7 @@ uNames   <- unitDef$Unit                                                        
 pNames   <- playerDef$Player                                                                # names of players (abbreviated)
 scrnRes  <- c(scrnResX,scrnResY)                                                            # screen resolution
 gridSize <- c(length(xNames),length(yNames))                                                # size of game board 
-sprRes   <- rep(floor(scrnRes[1]*0.73/gridSize[1]),2)                                       # resolution of sprites/units (scaled to match screen resolution)
-sprRes   <- c(44,44)
+sprRes   <- rep(floor(scrnResY*boardScale/gridSize[1]),2)                                   # resolution of sprites/units (scaled to match screen resolution)
 gridRes  <- gridSize*sprRes                                                                 # resolution of gameboard
 gameID   <- paste0(LETTERS[sample(1:26,1)],LETTERS[sample(1:26,1)],LETTERS[sample(1:26,1)],sample(111:999,1))
 yearStart<- year
@@ -85,6 +87,8 @@ for(i in 1:nrow(playerDef)){
     land       <- updateMapOwner(land,xNames[loc[pos,2]],yNames[gridSize[2]-loc[pos,1]+1],playerDef$Player[i])
   }
 }
+
+terrain   <- parse_terrain(boardDef)                                                       # should be defined somewhere after "gridRes"
 
 # Load images & sprites
 spr <- list()                                                                              # this will hold all sprites

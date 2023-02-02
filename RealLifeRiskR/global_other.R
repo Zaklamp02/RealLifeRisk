@@ -71,8 +71,7 @@ end_turn <- function(session,tbs,tland,input,output){
   playerDef$Gold <<- playerDef$Gold + landBonus * playerDef$Land                           # add land bonus (bonus * number of occupied land tiles)
   
   update_buttons(session)                                                                  # this will simply overwrite the current value
-#  msglog    <<- list()
-  
+
   #-------------------------------------------#
   # 1.6. SAVE RESULTS
   save_turn(session,tbs,tland)                                                             # log turn
@@ -98,13 +97,14 @@ save_turn <- function(session,tbs,tland,saveFiles=T){
   game[[paste(turn)]][['bs']] <<- tbs                                                     # store boardstate
   game[[paste(turn)]][['land']] <<- tland                                                 # store land ownership
   game[[paste(turn)]][['msglog']] <<- msglog
+  game[[paste(turn)]][['playerDef']] <<- playerDef
   
   if(as.numeric(turn) < max(as.numeric(names(game)))){                                    # if a parallel universe is started ...
     game[paste(seq(turn+1,max(as.numeric(names(game)))))] <<- NULL                        # ... destroy the old universe
   }
   
   if(saveFiles==T){
-#    saveRDS(game,file.path(wd,'savegame',paste0("Game_",gameID,"_turn_",turn,".rds")))    # save entire game
+    saveRDS(game,file=file.path(wd,'savegame',paste0("Game_",gameID,"_turn_",turn,".rda")))
     png(file.path(wd,'savegame',paste0("Game_",gameID,"_turn_",turn,'.png')),             # save png of boardState
         width=gridRes[1],height=gridRes[2])
     plot.new()
@@ -134,28 +134,22 @@ save_turn <- function(session,tbs,tland,saveFiles=T){
 #-------------------------------------------#
 
 render_board <- function(tbs,tland){
-#  terrain <- parse_terrain(boardDef)
-#  par(mar=rep(0,4))                                                                        # set figure margins to 0
-#  plot.window(xlim=c(0,gridRes[1]),ylim=c(0,gridRes[2]))                                   # create a window with correct size
-#  rasterImage(spr[['board']],0,0,gridRes[1],gridRes[2])                                    # create 'base layer' of game map to start drawing on
-#  rasterImage(terrain$terrain,0,0,gridRes[1],gridRes[2],interpolate=F)                     # create layer for cities and water
-#  plot(terrain$p,add=T,density=10,col='darkgrey')                                          # add texture to cities and water
-#  text(x=seq(0,gridRes[1]-sprRes[1],sprRes[1])+sprRes[1]/5, y = gridRes[2]+sprRes[1]/4, labels = xNames, font=2) # create coördinate labels along x axis
-#  text(x=-sprRes[1]/4, y = seq(0,gridRes[2]-sprRes[2],sprRes[2])+sprRes[1]/5, labels = yNames, font=2) # create coördinate labels along y axis
-}
-
-render_state <- function(tbs,tland){
-  terrain <- parse_terrain(boardDef)
   par(mar=rep(0,4))                                                                        # set figure margins to 0
   plot.window(xlim=c(0,gridRes[1]),ylim=c(0,gridRes[2]))                                   # create a window with correct size
   rasterImage(spr[['board']],0,0,gridRes[1],gridRes[2])                                    # create 'base layer' of game map to start drawing on
   rasterImage(terrain$terrain,0,0,gridRes[1],gridRes[2],interpolate=F)                     # create layer for cities and water
   plot(terrain$p,add=T,density=10,col='darkgrey')                                          # add texture to cities and water
   text(x=seq(0,gridRes[1]-sprRes[1],sprRes[1])+sprRes[1]/5, y = gridRes[2]+sprRes[1]/4, labels = xNames, font=2) # create coördinate labels along x axis
+  text(x=seq(0,gridRes[1]-sprRes[1],sprRes[1])+sprRes[1]/5, y = -sprRes[1]/4, labels = xNames, font=2) # create coördinate labels along x axis
   text(x=-sprRes[1]/4, y = seq(0,gridRes[2]-sprRes[2],sprRes[2])+sprRes[1]/5, labels = yNames, font=2) # create coördinate labels along y axis  par(mar=rep(0,4))                                                                        # set figure margins to 0
-#  plot.window(xlim=c(0,gridRes[1]),ylim=c(0,gridRes[2]))                                   # create a window with correct size
-  rasterImage(tland,0,0,gridRes[1],gridRes[2],interpolate=F)                               # create 'base layer' of game map to start drawing on
+  text(x=gridRes[2]+sprRes[1]/4, y = seq(0,gridRes[2]-sprRes[2],sprRes[2])+sprRes[1]/5, labels = yNames, font=2) # create coördinate labels along y axis  par(mar=rep(0,4))                                                                        # set figure margins to 0
+}
 
+render_state <- function(tbs,tland){
+  par(mar=rep(0,4))                                                                        # set figure margins to 0
+  plot.window(xlim=c(0,gridRes[1]),ylim=c(0,gridRes[2]))                                   # create a window with correct size
+  rasterImage(tland,0,0,gridRes[1],gridRes[2],interpolate=F)                               # create 'base layer' of game map to start drawing on
+  
   for(i in 1:nrow(tbs)){                                                                   # loop over all units in boardState
     hits <- which(tbs[i,'xRes'] == tbs$xRes & tbs[i,'yRes'] == tbs$yRes)
     
@@ -182,6 +176,7 @@ render_state <- function(tbs,tland){
     
   abline(h=seq(0,gridRes[2],sprRes[2]), col="darkgrey", lwd=2)                             # horizontal lines. Draw these LAST to mask potential sprite-overlaps
   abline(v=seq(0,gridRes[1],sprRes[1]), col="darkgrey", lwd=2)                             # vertical lines to complete the grid/raster
+  
 }
 
 #-------------------------------------------#

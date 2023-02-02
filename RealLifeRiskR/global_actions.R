@@ -16,6 +16,7 @@
 
 parse_action <- function(action){
   out <- list()
+  action <- toupper(action)
   if(is.character(action)){                                                    # then input is in character format
     act <- unlist(strsplit(action,'[.]'))                                      # try to split on '.' (CAN IMPROVE LATER!!!)
     
@@ -44,7 +45,7 @@ parse_action <- function(action){
         out$y1       <- toupper(gsub('\\D','', act[3]))
         out$x1       <- toupper(gsub('\\d','', act[3]))
         out$path     <- toupper(gsub('\\d','', act[4]))
-        if(is.na(out$quantity)){out$quantity<-1}                             # can be valid for special actions; i.e. radar, bomb
+        if(is.na(out$quantity)){out$quantity<-1}                               # can be valid for special actions; i.e. radar, bomb
         if(length(u)>1){                                                       # then multi-unit
           out$subunit <- list(u)
           out$subquantity <- list(n)
@@ -71,6 +72,7 @@ parse_action <- function(action){
 check_action <- function(tbs,player,unit,quantity,x1,y1,path,subunit=NULL,subquantity=NULL){
   out      <- list()                                                                                     # allocate variable to hold output
   out$type <- 'fout'                                                                                     # assume the worst
+  unit     <- toupper(unit)
   
   # Perform GENERAL checks
   if(! player %in% pNames){                                                                              # check if player name exists
@@ -108,7 +110,7 @@ check_action <- function(tbs,player,unit,quantity,x1,y1,path,subunit=NULL,subqua
     } else if(!any(tbs$player[tbs$xPos==x1 & tbs$yPos==y1] %in% player)){                                # check if PLAYER has units on square
       out$action  <- 'Je hebt hier geen units'
     } else if(!any(tbs$unit[tbs$xPos==x1 & tbs$yPos==y1 & tbs$player==player] %in% unit)){               # check if player has TARGET UNIT on square
-      out$action  <- paste(unit,'niet op startcoördinaat')
+      out$action  <- paste(unit,'niet op startcoordinaat')
     } else if(tbs$quantity[tbs$xPos==x1 & tbs$yPos==y1 & tbs$player==player & tbs$unit==unit] < quantity){ # check if player has sufficient QUANTITY of units
       out$action  <- paste0('Onvoldoende ',unit,' op ',y1,x1)
     } else if(nchar(path) > unitDef$Speed[unitDef$Unit==unit]){                                          # check if unit can move far enough
@@ -116,12 +118,12 @@ check_action <- function(tbs,player,unit,quantity,x1,y1,path,subunit=NULL,subqua
       ## "VRACHTWAGEN" LOGIC ## NOT PERFECT! ##
       #--------#
       if((unit != "VRW") & ("VRW" %in% subunit)){                                                        # if VRW is present, unit may travel in VRW
-        occ <- unitDef$Size[unitDef$Unit==unit] * quantity
-        cap <- unitDef$Capacity[unitDef$Unit=="VRW"] * subquantity[which("VRW" %in% subunit)]                                 # it is already established that "VRW" is present in subunit
+        occ <- unitDef$Size[unitDef$Unit==unit] * quantity                                               # check total 'size' of the unit
+        cap <- unitDef$Capacity[unitDef$Unit=="VRW"] * subquantity[which("VRW" %in% subunit)]            # it is already established that "VRW" is present in subunit
         if(occ > cap){
           out$action <- 'Geen capaciteit'
-        } else if(is.na(x2) | is.na(y2)){                                                                       # check if target coördinate is valid
-          out$action  <- 'Doelcoördinaat buiten kaart'
+        } else if(is.na(x2) | is.na(y2)){                                                                # check if target coordinate is valid
+          out$action  <- 'Doelcoordinaat buiten kaart'
         } else {
           out$type <- 'succes'
           out$action  <- paste0("Verplaats ",quantity,unit,' naar ',x2,y2)
@@ -131,7 +133,7 @@ check_action <- function(tbs,player,unit,quantity,x1,y1,path,subunit=NULL,subqua
       }
       #--------#
     } else if(is.na(x2) | is.na(y2)){                                                                    # check if target coördinate is valid
-      out$action  <- 'Doelcoördinaat buiten kaart'
+      out$action  <- 'Doelcoordinaat buiten kaart'
     } else {
       out$type <- 'succes'
       out$action  <- paste0("Verplaats ",quantity,unit,' naar ',x2,y2)
@@ -142,18 +144,15 @@ check_action <- function(tbs,player,unit,quantity,x1,y1,path,subunit=NULL,subqua
 }
 
 check_action_all <- function(tbs,player,unit,quantity,x1,y1,path,subunit=NULL,subquantity=NULL){
-  
-  subunit  <- unlist(subunit)                # nice to have, cannot hurt
+  subunit  <- unlist(subunit)
   subquantity <- unlist(subquantity)
   
   out <- check_action(tbs,player,unit,quantity,x1,y1,path)
   
-  if(out$type=='succes' & !is.null(subunit)){
-    for(i in 1:length(subunit)){
-      
-      # VRACHTWAGEN LOGIC: IF PELETON && VRACHTWAGEN, USE
-      
-      out <- check_action(tbs,player,subunit[i],subquantity[i],x1,y1,path,subunit,subquantity) #strsplit(path,'')[[1]][1],NULL,NULL)
+  # VRACHTWAGEN LOGIC: IF PELETON && VRACHTWAGEN, USE
+  if(out$type=='succes' & !is.null(subunit)){                                                                        # then multiple units are present
+    for(i in 1:length(subunit)){                                                                                     # check action validity per unit
+      out <- check_action(tbs,player,subunit[i],subquantity[i],x1,y1,path,subunit,subquantity)
       if(out$type=='fout'){break}
     }
     out$action <- sub(paste0(subquantity[i],subunit[i]),'meerdere',out$action)
@@ -167,6 +166,7 @@ parse_and_check <- function(tbs,action){
   if(prs$type=="succes"){
     prs <- check_action_all(tbs,prs$player,prs$unit,prs$quantity,prs$x1,prs$y1,prs$path,prs$subunit,prs$subquantity)
   }
+  
   return(prs)
 }
 
@@ -239,12 +239,13 @@ execute_move <- function(tbs,tland,player,unit,quantity,x1,y1,path){
     }
   }
   
+  msg <- paste(msg,tbs$xPos[rowFrom],tbs$yPos[rowFrom])                        # add destination coördinates to output message
+
   tbs <- setNames(aggregate(tbs[, c("quantity")],                              # remove any duplicate rows, and return boardstate
                             tbs[, names(tbs)[!names(tbs) %in% c("quantity")]], # this will take all rows that are identical
                             FUN = sum, na.rm = TRUE),                          # ... and collapse them while summing the quantity
                   c(names(tbs)[!names(tbs) %in% c("quantity")],"quantity"))    # finally, make sure column names are correct
   
-  msg <- paste(msg,tbs$xPos[rowFrom],tbs$yPos[rowFrom])                        # add destination coördinates to output message
   
   return(list(tbs=tbs,tland=tland,msg=msg))
 }

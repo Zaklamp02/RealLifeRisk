@@ -249,9 +249,6 @@ server <- function(input, output, session) {
     yTmp <- input$board_dblclick$y - input$board_dblclick$y %% sprRes[2]                      # find nearest y coördinate
     tile <- which(d$bs$xRes==xTmp & d$bs$yRes==yTmp)
     
-#    if(length(tile)==0){ # then clear tile
-#    d$land <- updateMapOwner(d$land,xTmp/sprRes[1],yTmp/sprRes[2],"HRT")
- #   }else 
       if(length(tile)>=1){
       output$board_hover_box <- renderUI({
         loc    <- input$board_dblclick
@@ -277,6 +274,22 @@ server <- function(input, output, session) {
         )
       })
     }
+  })
+  
+  #-------------------------------------------#
+  # 2.f. OBSERVE: LOAD GAMEFILE
+  #-------------------------------------------#
+  observeEvent(input$loadGameFile,{
+    game <<- readRDS(input$loadGameFile$datapath)
+    turn <<- max(as.numeric(ls(game)))
+
+    playerDef <<- game[[paste(turn)]][['playerDef']]
+    msglog <<- game[[paste(turn)]][['msglog']]
+    d$bs   <- game[[paste(turn)]][['bs']]
+    d$land <- game[[paste(turn)]][['land']]
+      
+    update_buttons(session)                                                                 # make sure the 'turn' and 'year' buttons are correct
+    
   })
   
   #-------------------------------------------#
@@ -387,6 +400,26 @@ server <- function(input, output, session) {
     }
   })
   
+  #-------------------------------------------#
+  # 6. Create cheatsheet
+#  output$cheatsheet <- renderUI({HTML(cheat_sheet())})
+  output$cheatsheet <- DT::renderDataTable(
+                        datatable(cheat_sheet(), 
+                                  rownames=FALSE,
+                                  options = list(dom = 't')
+                                  )
+                        )
+  output$cheatsheet_units <- DT::renderDataTable(
+                              datatable(unitDef[c("Unit","Label","Speed","Cost","KillBonus","Dropable","Size","Capacity")],
+                                        rownames=FALSE,
+                                        options = list(dom = 't')
+                                        )
+                              )
+  
+  #-------------------------------------------#
+  # 7. Create credits screen
+  output$credits <- renderUI({HTML(credits_report())})
+
   #-------------------------------------------#
   # X. EXIT
   #-------------------------------------------#

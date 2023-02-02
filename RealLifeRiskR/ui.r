@@ -43,7 +43,9 @@ ui <- dashboardPage(
       tags$head(tags$style(".inactiveLink {pointer-events: none;cursor: default;}")),              # by default, disable sidebar
       menuItem("Player",tabName="Player"),                                                         # create buttons for each tab
       menuItem("Main",tabName="Main"),                                                             # ... order is important!
-      menuItem("Settings",tabName="Settings")
+      menuItem("CheatSheet",tabName="CheatSheet"),
+      menuItem("Laad game",tabName="Laadgame"),
+      menuItem("Credits",tabName="Credits")
     )
   ),
   
@@ -54,9 +56,15 @@ ui <- dashboardPage(
     useShinyjs(),                                                                                  # this adds a lot of useful javascript options
     tags$head(tags$link(rel = "stylesheet", type = "text/css", href = "custom.css")),              # this will add all our custom styling options
     tags$style(type="text/css", ".shiny-html-output { padding-left:20px;} .nav-tabs-custom {margin-bottom: 0px;}"), # this helps with the layout of html text in tabboxes
-    tags$head(tags$style(
-      HTML('.wrapper {height: auto !important; position:relative; overflow-x:hidden; overflow-y:hidden}')
-    )),
+    tags$head(tags$style(HTML('.wrapper {height: auto !important; position:relative; overflow-x:hidden; overflow-y:hidden}'))),
+    tags$head(tags$style(".creditsbg {background:url('menu_main.png'); background-repeat: no-repeat; background-size: cover; opacity: 0.8;}")),
+    tags$style(HTML(paste0(".nav-tabs-custom > .nav-tabs > li > a[data-value='Leiding'] {background-color:grey;}",
+                           ".nav-tabs-custom > .nav-tabs > li > a[data-value='",playerDef$Label[1],"'] {background-color:",playerDef$hexcol[1],";}",
+                           ".nav-tabs-custom > .nav-tabs > li > a[data-value='",playerDef$Label[2],"'] {background-color:",playerDef$hexcol[2],";}",
+                           ".nav-tabs-custom > .nav-tabs > li > a[data-value='",playerDef$Label[3],"'] {background-color:",playerDef$hexcol[3],";}",
+                           ".nav-tabs-custom > .nav-tabs > li > a[data-value='",playerDef$Label[4],"'] {background-color:",playerDef$hexcol[4],";}"
+                          ))),
+    
     tabItems(                                                                                      # separate contents into several tabs
       
       #-------------------------------------#
@@ -66,7 +74,7 @@ ui <- dashboardPage(
               
               #-----------------------------#
               # 3.a.1. GAME BOARD
-              column(9,                                                                            # columns can have a width of 1-12, which is relative to the 'box' the column exists in
+              column(8,                                                                            # columns can have a width of 1-12, which is relative to the 'box' the column exists in
                      fluidRow(
                        div(id="container",                                                         # create custom container to hold 2 plots on top of eachother
                            style="position:relative;",                                             # no idea if this is necessary
@@ -79,7 +87,7 @@ ui <- dashboardPage(
               
               #---------------------------#
               # 3.a.2 GAME OVERVIEW
-              column(3,                                                                            # note that we are still in the same row, but we are defining a new column (of width=3, which together with the previous one makes exactly 12)
+              column(4,                                                                            # note that we are still in the same row, but we are defining a new column (of width=3, which together with the previous one makes exactly 12)
                      fluidRow(
                        actionButton("btn_endTurn", label = "Einde Beurt", style=paste("background-color:darkgrey"),width="98%"),
                        actionButton("backward","<<",width="19%"),
@@ -110,18 +118,24 @@ ui <- dashboardPage(
                        do.call(tabBox, c(id='tab2',width='100%', height="580px",lapply(0:nrow(playerDef), function(i) {
                          if(i==0){                                                                 # first create a tab for non-players  
                            tabPanel(                                                               # create a tabPanel    
-                             title="X",                                                            # give it a name
+                             title="Leiding",                                                      # give it a name
+                             helpText("Algemeen actie invoer veld. Basis-structuur: [team].[unit].[locatie]
+                                      Dus bijvoorbeeld: PAN.PLT3.H4 = Herten kopen 3 peletons op H3. Van bestaande units kan ook een verplaatsing worden aangegeven.
+                                      SPW.PLT4.J1.NNO = Sperwers verplaatsen 4 peletons van J1 noord.noord.oost."),
                              fluidRow(                                                          
                                column(6,textInput('hostaction',NULL,"")),                          # create action input field
-                               actionButton("hostactionsubmit","Actie",icon=icon("cog"))                # create action submission button that will also provide feedback on action validity
+                               actionButton("hostactionsubmit","Actie",icon=icon("cog"))           # create action submission button that will also provide feedback on action validity
                              ),
+                             helpText("Hieronder kun je extra goud geven, bijvoorbeeld 'PAN.GOUD.1000"),
                              fluidRow(                                                          
-                               column(6,textInput('hostspecial',NULL,"")),                          # create action input field
-                               actionButton("hostspecialsubmit","Speciale Actie",icon=icon("cog"))                # create action submission button that will also provide feedback on action validity
+                               column(6,textInput('hostspecial',NULL,"")),                         # create action input field
+                               actionButton("hostspecialsubmit","Speciale Actie",icon=icon("cog")) # create action submission button that will also provide feedback on action validity
                              ),
+                             helpText("Hier kun je berichten sturen. Die komen op het eerstvolgende overzicht. Zoals 'gelukkig nieuwjaar'
+                                      Je kunt ook berichten naar een specifiek team sturen, bijvoorbeeld 'PAN.dit is een testbericht'"),
                              fluidRow(                                                          
-                               column(6,textInput('hostmsg',NULL,"")),                          # create action input field
-                               actionButton("hostmsgsubmit","Stuur Bericht",icon=icon("cog"))                # create action submission button that will also provide feedback on action validity
+                               column(6,textInput('hostmsg',NULL,"")),                             # create action input field
+                               actionButton("hostmsgsubmit","Stuur Bericht",icon=icon("cog"))      # create action submission button that will also provide feedback on action validity
                              ),
                              hr(),
                              div(style = 'overflow-y:scroll; overflow-x: hidden; height:310px;',
@@ -206,61 +220,66 @@ ui <- dashboardPage(
       ),
       
       #-----------------------------------------#
-      # 3.c CREATE SETTINGS TAB
+      # 3.c CREATE CHEATSHEET TAB
       #-----------------------------------------#
       tabItem(
-        tabName="Settings",
+        tabName="CheatSheet",
         
-        column(4,
-               fluidRow(
-                 box(title="Game Settings", status = "primary", width="100%",
-                     textInput("ip_address","IP Adres","Unknown IP"),
-                     textInput("turn_bonus","Bonus per turn",turnBonus),
-                     textInput("year_bonus","Bonus per jaar",yearBonus),
-                     textInput("year_cycle","Beurten per jaar",yearCycle),
-                     textInput("start_year","Start jaar",year),
-                     textInput("start_turn","Start beurt",turn)
-                 ),
-                 box(title="Settings", status = "primary", width="100%",
-                     column(6,textInput("scrn_res_x","Scherm Resolutie (x)",scrnRes[1])),
-                     column(6,textInput("scrn_res_y","Scherm Resolutie (y)",scrnRes[2])),
-                     column(6,textInput("grd_size_x","Speelbord dim (x)",gridRes[1])),
-                     column(6,textInput("grd_size,y","Speelbord dim (y)",gridRes[2]))
-                 )
-               )
-        ),
         column(8,
                column(12,
                       fluidRow(
-                        DT::dataTableOutput("tbl_boardState")
-                      )
-               ),
-               column(12,
-                      
-                      column(6,
-                             fluidRow(
-                               box(title="Save/Load", status = "primary", width="100%",
-                                   fluidRow(style='padding:10px;',
-                                            actionButton("save","Save Game",icon('save')),
-                                            actionButton("save","Save CSV",icon('table')),
-                                            downloadButton("saveImg","Save PNG", icon('image')),
-                                            actionButton("saveGif","Save Gif",icon('film'))
-                                   ),
-                                   fluidRow(style='padding:10px;',
-                                            fileInput("file1", NULL, multiple = FALSE, accept = c("text/csv","text/comma-separated-values,text/plain",".csv"))
-                                   )
-                               )
-                             )
-                      ),
-                      column(6,
-                             fluidRow(
-                               box(title="Audio", status = "primary", width="100%",
-                                   tags$audio(src = "Nijmegen.mp3", type = "audio/mp3", autoplay = 1, controls = NA)
-                               )
-                             )
+                        box(title="Uitleg acties", status = "primary", width="100%",
+                            DT::dataTableOutput("cheatsheet")
+                        ),
+                        box(title="Unit overzicht", status = "primary", width="100%",
+                            DT::dataTableOutput("cheatsheet_units")
+                        )
                       )
                )
+        ),
+        column(4,
+               fluidRow(
+                 box(title="Game Settings", status = "primary", width="100%",
+                     disabled(textInput("ip_address","IP Adres","Unknown IP")),
+                     disabled(textInput("turn_bonus","Bonus per turn",turnBonus)),
+                     disabled(textInput("year_bonus","Bonus per jaar",yearBonus)),
+                     disabled(textInput("year_cycle","Beurten per jaar",yearCycle)),
+                     disabled(textInput("start_year","Start jaar",year)),
+                     disabled(textInput("start_turn","Start beurt",turn))
+                 ),
+                 box(title="Settings", status = "primary", width="100%",
+                     disabled(column(6,textInput("scrn_res_x","Scherm Resolutie (x)",scrnRes[1]))),
+                     disabled(column(6,textInput("scrn_res_y","Scherm Resolutie (y)",scrnRes[2]))),
+                     disabled(column(6,textInput("grd_size_x","Speelbord dim (x)",gridRes[1]))),
+                     disabled(column(6,textInput("grd_size,y","Speelbord dim (y)",gridRes[2])))
+                 ),
+                 box(title="Audio", status = "primary", width="100%",
+                     tags$audio(src = "Nijmegen.mp3", type = "audio/mp3", autoplay = 1, controls = NA)
+                 )
+               )
         )
+      ),
+
+      #-----------------------------------------#
+      # 3.d CREATE LOAD GAME TAB
+      #-----------------------------------------#
+      tabItem(
+        tabName="Laadgame",
+        fluidRow(
+          box(title="Save/Load", status = "primary", width="100%",
+            fluidRow(style='padding:10px;',
+                     fileInput("loadGameFile", NULL, multiple = FALSE, accept = c(".rda"))
+            )
+          )
+        )
+      ),
+      
+      #-----------------------------------------#
+      # 3.e CREATE CREDITS TAB
+      #-----------------------------------------#
+      tabItem(
+        tabName="Credits",
+        htmlOutput("credits", class='creditsbg')
       )
     )
   )
@@ -277,24 +296,3 @@ ui <- dashboardPage(
 #    \||/\/\//\|/     
 #
 # 
-
-# tags$style(".nav-tabs {
-#            padding-top:0px;
-#            }
-#            
-#            .nav-tabs-custom .nav-tabs li.active:hover a, .nav-tabs-custom .nav-tabs li.active a {
-#            padding-top:0px;
-#            }
-#            
-#            .nav-tabs-custom .nav-tabs li.active {
-#            padding-top:0px;
-#            }
-#            
-#            .nav-tabs-custom>.nav-tabs>li>a:hover {
-#            padding-top:0px;
-#            }  
-#            .nav-tabs-custom>.nav-tabs>li>a {
-#            paddingtop:0px;
-#            }"
-#                
-# ),

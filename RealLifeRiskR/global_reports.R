@@ -116,6 +116,53 @@ generate_radar_report <- function(player){
 }
 
 #-------------------------------------------#
+# 5. CREDITS REPORT
+#-------------------------------------------#
+
+credits_report <- function(){
+  html_align="center"
+  
+  title_pre = "<h1 align='center' style='color:red'><b>"
+  title_post = "</h1></b>"
+  main_pre = "<h2 align='center' style='color:white'><b>"
+  main_post = "</h2></b>"
+  
+  paste0(
+    b,
+    title_pre,"Spel-ontwerp:",title_post,b,
+    main_pre,"Hilbert Vinke | Joachaz van Keulen | Maarten-Marijn Koens | Rick Gerrits",b,"Rutger Schols | Stijn Hautvast | Tijmen Dokter",main_post,b,
+    
+    title_pre,"Programmeerwerk:",title_post,b,
+    main_pre,"Sebastiaan den Boer",main_post,b,
+    
+    title_pre,"Sprites, Kaart & Visuals:",title_post,b,
+    main_pre,"Maarten-Marijn Koens",main_post,b,
+    
+    
+    title_pre,"Origineel spelidee & programmeerwerk",title_post,b,
+    main_pre,"Guit-Jan Ridderbos | Peter Niemeijer | Peter Wieringa",main_post,b,
+    
+    title_pre,"Standing on the shoulders of these giants:",title_post,b,
+    main_pre,"Guit-Jan Ridderbos | Peter Niemeijer | Matthijs van Calveen | Niek van den Esker",main_post,b
+
+  )
+}
+
+#-------------------------------------------#
+# 6. CHEATSHEET
+#-------------------------------------------#
+
+cheat_sheet <- function(){
+
+  Actie = c("Verplaats","Verplaats Meerdere","Verplaats in Vrachtwagen","Koop Unit","Bombardement","Radarscan","Geef Goud","Bericht aan allen","Bericht aan player")
+  Formaat = c("[player] [unit+aantal] [startcoordinaat] [verplaatsing]","[player] [unit1+aantal1+unit2+aantal2] [startcoordinaat] [verplaatsing]","[player] [unit1+aantal1+unit2+aantal2] [startcoordinaat] [verplaatsing]","[player] [unit+aantal] [doelcoordinaat]","[player] [unit+aantal] [doelcoordinaat]","[player] [unit] [doelcoordinaat]","[player] [GOUD] [hoeveelheid]","[bericht]","[player] [bericht]")
+  Voorbeeld = c("HER . PLT3 . K12 . NNO","HER . PLT3TNK1 . K12 . NNO","HER . VRW1PLT3 . K12 . NNOOOO","HER . PLT2 . K12","HER . BOM1 . K12","HER . RAD1 . K12","HER . GOUD . 1000","Testbericht","HRT . Testbericht")
+  
+  report = data.frame(Actie,Formaat,Voorbeeld)
+  return(report)
+}
+
+#-------------------------------------------#
 # X. HELPER: RECTIFY MESSAGES
 #-------------------------------------------#
 rectify <- function(msgIn,nc=50){
@@ -138,6 +185,7 @@ rectify <- function(msgIn,nc=50){
   
   return(msgOut)  
 }
+
 
 # %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 # X. ARCHIVE
